@@ -1,0 +1,11 @@
+*.pyc
+*.pyx
+/cntkRelease_2016_10_04/
+/cntkRelease_2016_10_19/
+/old/
+/proc/
+/resources/cntk/AlexNet.89
+/resources/pascalVocData/selective_search_data/
+/resources/pascalVocData/VOCdevkit2007/
+/resources/pascalVocData/VOCdevkit2012/
+/results/
