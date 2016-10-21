@@ -39,12 +39,14 @@ Typically *pip.exe* comes installed with Python. If that is not the case on your
 C:/Python/python -m ensurepip
 ````
 
-Lastly, if the CNTK binaries are not located at "C:/CNTK/", the variable `cntkBinariesDir` in `PARAMETERS.py` needs to be updated to point to the correct directory:
+If the CNTK binaries are not located at "C:/CNTK/", the variable `cntkBinariesDir` in `PARAMETERS.py` needs to be updated to point to the correct directory:
 ```python
 cntkBinariesDir = "myCntkBinariesDirectory>"
 ```
 
-Some of these steps can be skipped when using the Azure Data Science VM. Also, Azure VMs with state-of-the-art GPUs are already available in preview mode! See the [Cortana Intelligence Gallery](https://gallery.cortanaintelligence.com/Solution/Linux-Data-Science-Virtual-Machine-3) for a 1-click deployment solution.
+And finally, the file *AlexNet.89* is too big to be hosted in Github and hence needs to be downloaded manually from [here](https://objectdetectionusingcntk.blob.core.windows.net/objectdetectionusingcntk/AlexNet.89) and placed into the subfolder */resources/cntk/AlexNet.89*.
+
+If you lack a strong GPU, or don't want to install CNTK yourself, then consider using Azure's Data Science Virtual Machine which come with state-of-the-art GPUs. The GPU-VMs are currently in preview model but will be fully available soon. See the [Cortana Intelligence Gallery](https://gallery.cortanaintelligence.com/Solution/Linux-Data-Science-Virtual-Machine-3) for a 1-click deployment solution.
 
 
 
@@ -206,7 +208,7 @@ PART 2
 --------------
 In part 1 we learned how to classify ROIs by training a linear Support Vector Machine on the output of a given Neural Network. We will now show how to instead perform this classification directly in the Deep Neural Network. This can be achieved by adding a new last layer which, given the input from the last fully connected layer, outputs the probabilities for each ROI to be of a certain class. See section [SVM vs NN training](#svm-vs-nn-training) for pros/cons of the two different approaches.
 
-Training the Neural Network instead of an SVM is done by simply changing the variable `classifier` in `PARAMETERS.py` from "svm" to "nn". Then, as described in part 1, all the scripts need to be executed in order, except for the SVM training in step 4. This will add a classification layer to the network and train the last layer(s) of the network, and for each ROI write its classification label and confidence to disk (rather than the 4096 floats representation which was required to train the SVM). Note that NN training can cause an out-of-memory error on less powerful machines which can possibly be avoided by reducing the number of ROIs per image from 2000 to e.g. 200 (see variable `cntk_nrRois` in `PARAMETERS.py`). 
+Training the Neural Network instead of an SVM is done by simply changing the variable `classifier` in `PARAMETERS.py` from "svm" to "nn". Then, as described in part 1, all the scripts need to be executed in order, except for the SVM training in step 4. This will add a classification layer to the network and train the last layer(s) of the network, and for each ROI write its classification label and confidence to disk (rather than the 4096 floats representation which was required to train the SVM). Note that NN training can cause an out-of-memory error on less powerful machines which can possibly be avoided by reducing the number of ROIs per image from 2000 to e.g. 200 (see variable `cntk_nrRois` in `PARAMETERS.py`).
 
 The mean Average Precision measure after running all steps should roughly look like the results below. Note that the accuracy on the training set is much higher compared to training a linear SVM (part 1, step 5). This is because the neural network is less regularized and hence able to memorize the training set better.
 
