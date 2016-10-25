@@ -56,15 +56,14 @@ Train = {
 
         #network     = BS.Network.Load ("$ConfigDir$/AlexNet.89")
         network     = BS.Network.Load ("../../../resources/cntk/AlexNet.89")
-        pool1       = BS.Network.CloneFunction(network.features, network.pool1, parameters = "constant")
-        convLayers  = BS.Network.CloneFunction(network.pool1, network.conv5_y, parameters = "constant")
+		convLayers  = BS.Network.CloneFunction(network.features, network.conv5_y, parameters = "constant")    
         fcLayers    = BS.Network.CloneFunction(network.pool3, network.h2_d)
-
+		
+		
         model (features, rois) = {
             featNorm = features - 114
-            pool1Out = pool1 (featNorm)
-            conv5Out = convLayers (pool1Out)
-            roiOut   = ROIPooling (conv5Out, rois, (6:6))
+			convOut  = convLayers (featNorm)
+            roiOut   = ROIPooling (convOut, rois, (6:6))
             fcOut    = fcLayers (roiOut)
             W        = ParameterTensor{($NumLabels$:4096), init="glorotUniform"}
             b        = ParameterTensor{$NumLabels$, init = 'zero'}
