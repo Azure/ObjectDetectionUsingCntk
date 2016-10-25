@@ -38,7 +38,7 @@ TrainROILabelDim = 4400         # $NumTrainROIs$ * $NumLabels$
 TestROIDim = 4000               # $NumTestROIs$ * 4
 TestROILabelDim = 22000         # $NumTestROIs$ * $NumLabels$
 
-# For training we load a pretrained AlexNet model (AlexNet.89) and clone three parts of it.
+# For training we load a pretrained AlexNet model (AlexNet.model) and clone three parts of it.
 # For the first part (up to pool1) we keep the weights fixed. The middle part contains the
 # remaining convolutional and pooling layers and the last part are the FC layers. 
 # In the model we apply the first two cloned parts, then an ROI pooling layer and 
@@ -54,8 +54,7 @@ Train = {
         labelShape = $NumLabels$:$NumTrainROIs$         # 21:64
         ROIShape   = 4:$NumTrainROIs$                   # 4:64
 
-        #network     = BS.Network.Load ("$ConfigDir$/AlexNet.89")
-        network     = BS.Network.Load ("../../../resources/cntk/AlexNet.89")
+        network     = BS.Network.Load ("../../../resources/cntk/AlexNet.model")
 		convLayers  = BS.Network.CloneFunction(network.features, network.conv5_y, parameters = "constant")    
         fcLayers    = BS.Network.CloneFunction(network.pool3, network.h2_d)
 		

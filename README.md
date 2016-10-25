@@ -47,7 +47,7 @@ If the CNTK binaries are not located at "C:/local/cntk/cntk/", the variable `cnt
 cntkBinariesDir = "myCntkBinariesDirectory>"
 ```
 
-And finally, the file *AlexNet.89* is too big to be hosted in Github and hence needs to be downloaded manually from [here](https://objectdetectionusingcntk.blob.core.windows.net/objectdetectionusingcntk/AlexNet.89) and placed into the subfolder */resources/cntk/AlexNet.89*.
+And finally, the file *AlexNet.model* is too big to be hosted in Github and hence needs to be downloaded manually from [here](https://www.cntk.ai/Models/AlexNet/AlexNet.model) and placed into the subfolder */resources/cntk/AlexNet.model*.
 
 If you lack a strong GPU, don't want to install CNTK yourself, or want to train a model using multiple GPUs, then consider using Azure's Data Science Virtual Machine. The GPU-VMs are currently in preview model but will be fully available soon. See the [Cortana Intelligence Gallery](https://gallery.cortanaintelligence.com/Solution/Linux-Data-Science-Virtual-Machine-3) for a 1-click deployment solution.
 
