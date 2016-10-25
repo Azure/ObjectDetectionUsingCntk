@@ -1,5 +1,5 @@
 
-Fast R-CNN Object Detection Tutorial for CNTK
+Fast R-CNN Object Detection Tutorial for Microsoft Cognitive Toolkit (CNTK)
 ==============
 
 DESCRIPTION
@@ -7,12 +7,12 @@ DESCRIPTION
 
 Object Detection is one of the main problems in Computer Vision. Traditionally, this required expert knowledge to identify and implement so called “features” that highlight the position of objects in the image. Starting in 2012 with the famous AlexNet paper, Deep Neural Networks are used to automatically find these features. This lead to a huge improvement in the field for a large range of problems.
 
-This tutorial uses CNTK’s fast R-CNN implementation (see the [Fast R-CNN](#fast-r-cnn) section for a description) which was shown to produce state-of-the-art results for [Pascal VOC](http://host.robots.ox.ac.uk/pascal/VOC/), one of the main object detection challenges in the field.
+This tutorial uses Microsoft Cognitive Toolkit's (CNTK) fast R-CNN implementation (see the [Fast R-CNN](#fast-r-cnn) section for a description) which was shown to produce state-of-the-art results for [Pascal VOC](http://host.robots.ox.ac.uk/pascal/VOC/), one of the main object detection challenges in the field.
 
 GOALS
 --------------
 
-The goal of this tutorial is to show how to train and test your own object detection model using [CNTK](https://github.com/Microsoft/CNTK), Microsoft’s deep learning toolkit. Example data and annotations are provided, but the reader can also bring their own images and train their own, unique, object detector.
+The goal of this tutorial is to show how to train and test your own Deep Learning object detection model using [Microsoft Cognitive Toolkit (CNTK)](https://github.com/Microsoft/CNTK). Example data and annotations are provided, but the reader can also bring their own images and train their own, unique, object detector.
 
 The tutorial is split into four parts:
 -	[Part 1](#part-1) shows how to train an object detection model for the example data without retraining the provided Neural Network, but instead training an external classifier on its output. This approach works particularly well with small datasets, and does not require expertise with deep learning.
@@ -20,12 +20,15 @@ The tutorial is split into four parts:
 -	[Part 3](#part-3) illustrates how to annotate your own images and use these to train an object detection model for your specific use case.
 -	[Part 4](#part-4) covers how to reproduce published results on the Pascal VOC dataset.
 
-Previous expertise with Machine Learning while not required to complete this tutorial, however is very helpful to understand the underlying principles.
+Previous expertise with Machine Learning while not required to complete this tutorial, however is very helpful to understand the underlying principles. More information on the topic can also be found at [CNTK's Fast-RCNN page](https://github.com/Microsoft/CNTK/tree/master/Examples/Image/Detection/FastRCNN).
+
+
+
 
 PREREQUISITS
 --------------
 
-This tutorial requires CNTK version >= 2.0 and Python version 2 to be installed. Both 32-bit and 64-bit versions of Python are supported, however 32-bit Python runs out of memory during SVM training even if the dataset is small (such as the provided example dataset for grocery detection). The python interpreter can be downloaded from the [official download page](https://www.python.org/downloads/windows/), and CNTK installation instructions are given on the [binaries download page](https://github.com/Microsoft/CNTK/releases). In the following we assume that the python interpreter is installed in *C:/Python/* and the CNTK binaries are in *C:/CNTK/*. A dedicated GPU is not required, but recommended for retraining of the Neural Network (part 2).
+This tutorial requires CNTK version >= 2.0 and Python version 2 to be installed. Both 32-bit and 64-bit versions of Python are supported, however 32-bit Python runs out of memory during SVM training even if the dataset is small (such as the provided example dataset for grocery detection). The python interpreter can be downloaded from the [official download page](https://www.python.org/downloads/windows/), and CNTK installation instructions are given on the [download page](https://github.com/Microsoft/CNTK/wiki/CNTK-Binary-Download-and-Configuration). CNTK will also install a Python Anaconda environment which we will not use (since this tutorial was written for Python 2). In the following we assume that the python interpreter is installed in *C:/Python/* and the CNTK binaries are in *C:/CNTK/*. A dedicated GPU is not required, but recommended for retraining of the Neural Network (part 2).
 
 Several Python packages are required to execute the python scripts: Pillow, xmltodict, wheel, numpy, opencv, scikit-learn, scipy, matplotlib, scikit-image, easydict and selectivesearch. These libraries can be installed easily using the provided python wheels  in *resources/python2_{32,64}bit_requirements/*. The libraries can be installed by opening a command prompt and running:
 ````bash
@@ -46,7 +49,7 @@ cntkBinariesDir = "myCntkBinariesDirectory>"
 
 And finally, the file *AlexNet.89* is too big to be hosted in Github and hence needs to be downloaded manually from [here](https://objectdetectionusingcntk.blob.core.windows.net/objectdetectionusingcntk/AlexNet.89) and placed into the subfolder */resources/cntk/AlexNet.89*.
 
-If you lack a strong GPU, or don't want to install CNTK yourself, then consider using Azure's Data Science Virtual Machine which come with state-of-the-art GPUs. The GPU-VMs are currently in preview model but will be fully available soon. See the [Cortana Intelligence Gallery](https://gallery.cortanaintelligence.com/Solution/Linux-Data-Science-Virtual-Machine-3) for a 1-click deployment solution.
+If you lack a strong GPU, don't want to install CNTK yourself, or want to train a model using multiple GPUs, then consider using Azure's Data Science Virtual Machine. The GPU-VMs are currently in preview model but will be fully available soon. See the [Cortana Intelligence Gallery](https://gallery.cortanaintelligence.com/Solution/Linux-Data-Science-Virtual-Machine-3) for a 1-click deployment solution.
 
 
 
@@ -350,7 +353,9 @@ The table below shows the mean Average Precision (mAP) of our final model, and c
 |Dataset| mAP
 |---|---
 |Published results|0.52
-|Our results|0.45
+|Our results|0.48
+
+More information on training a PascalVOC classifier (including a download link to a trained model) can be found at [CNTK's Fast-RCNN page](https://github.com/Microsoft/CNTK/tree/master/Examples/Image/Detection/FastRCNN).
 
 
 TECHNOLOGY
@@ -408,7 +413,6 @@ Other items for future work include:
 - Using a more recent DNN topology such as ResNet instead of AlexNet.
 
 
-FEEDBACK
+AUTHOR
 ---------------
-Feedback regarding this tutorial is very welcome and can be send to:  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Patrick Buehler, Senior Data Scientist, pabuehle@microsoft.com
+Patrick Buehler, Senior Data Scientist
