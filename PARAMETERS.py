@@ -10,8 +10,8 @@ print datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 # Adjust these parameters
 # to make scripts run
 ############################
-rootDir = os.path.dirname(os.path.realpath(sys.argv[0]))  #"C:/Users/pabuehle/Desktop/rnnObjectDetection/"
-cntkBinariesDir = rootDir + "/CntkRelease_2016_10_19/"
+rootDir = os.path.dirname(os.path.realpath(sys.argv[0]))
+cntkBinariesDir = "C:/local/cntk/cntk/"
 
 
 ############################

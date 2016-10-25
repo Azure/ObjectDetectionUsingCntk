@@ -28,7 +28,7 @@ Previous expertise with Machine Learning while not required to complete this tut
 PREREQUISITS
 --------------
 
-This tutorial requires CNTK version >= 2.0 and Python version 2 to be installed. Both 32-bit and 64-bit versions of Python are supported, however 32-bit Python runs out of memory during SVM training even if the dataset is small (such as the provided example dataset for grocery detection). The python interpreter can be downloaded from the [official download page](https://www.python.org/downloads/windows/), and CNTK installation instructions are given on the [download page](https://github.com/Microsoft/CNTK/wiki/CNTK-Binary-Download-and-Configuration). CNTK will also install a Python Anaconda environment which we will not use (since this tutorial was written for Python 2). In the following we assume that the python interpreter is installed in *C:/Python/* and the CNTK binaries are in *C:/CNTK/*. A dedicated GPU is not required, but recommended for retraining of the Neural Network (part 2).
+This tutorial requires CNTK version >= 2.0 and Python version 2 to be installed. Both 32-bit and 64-bit versions of Python are supported, however 32-bit Python runs out of memory during SVM training even if the dataset is small (such as the provided example dataset for grocery detection). The python interpreter can be downloaded from the [official download page](https://www.python.org/downloads/windows/), and CNTK installation instructions are given on the [download page](https://github.com/Microsoft/CNTK/wiki/CNTK-Binary-Download-and-Configuration). CNTK will also install a Python Anaconda environment which we will not use (since this tutorial was written for Python 2). In the following we assume that the python interpreter is installed in *C:/Python/* and the CNTK binaries are in *C:/local/cntk/cntk/*. A dedicated GPU is not required, but recommended for retraining of the Neural Network (part 2).
 
 Several Python packages are required to execute the python scripts: Pillow, xmltodict, wheel, numpy, opencv, scikit-learn, scipy, matplotlib, scikit-image, easydict and selectivesearch. These libraries can be installed easily using the provided python wheels  in *resources/python2_{32,64}bit_requirements/*. The libraries can be installed by opening a command prompt and running:
 ````bash
@@ -42,7 +42,7 @@ Typically *pip.exe* comes installed with Python. If that is not the case on your
 C:/Python/python -m ensurepip
 ````
 
-If the CNTK binaries are not located at "C:/CNTK/", the variable `cntkBinariesDir` in `PARAMETERS.py` needs to be updated to point to the correct directory:
+If the CNTK binaries are not located at "C:/local/cntk/cntk/", the variable `cntkBinariesDir` in `PARAMETERS.py` needs to be updated to point to the correct directory:
 ```python
 cntkBinariesDir = "myCntkBinariesDirectory>"
 ```
