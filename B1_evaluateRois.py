@@ -35,16 +35,16 @@ for subdir in subdirs:
         roiCounts.append(len(rois))
 
         # for each ground truth, compute if it is covered by an roi
-        maxOverlap = -1
         for gtIndex, (gtLabel, gtBox) in enumerate(zip(gtLabels,gtBoxes)):
+            maxOverlap = -1
             assert (gtBox.max() <= max(imgWidth, imgHeight) and gtBox.max() >= 0)
             if gtLabel in classes[1:]:
                 for roi in rois:
                     assert (roi.max() <= max(imgWidth, imgHeight) and roi.max() >= 0)
                     overlap = bboxComputeOverlapVoc(gtBox, roi)
                     maxOverlap = max(maxOverlap, overlap)
-        overlaps.append(maxOverlap)
-print "Average number of rois per image " + str(1.0 * sum(roiCounts) / len(overlaps))
+            overlaps.append(maxOverlap)
+print "Average number of rois per image " + str(1.0 * sum(roiCounts) / len(imgFilenames))
 
 #compute recall at different overlaps
 overlaps = np.array(overlaps, np.float32)
