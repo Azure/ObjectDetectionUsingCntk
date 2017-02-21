@@ -1,53 +1,71 @@
-import pdb, sys, os, time
+from __future__ import division
+from __future__ import print_function
+from builtins import str
+from builtins import range
+from builtins import object
+from past.utils import old_div
+import pdb, sys, os, time, random, dlib
+from os.path import join
 import numpy as np
-import selectivesearch
 from easydict import EasyDict
 from fastRCNN.nms import nms as nmsPython
 
+from cntk import Trainer, UnitType, load_model
+from cntk.blocks import Placeholder, Constant
+from cntk.device import default #gpu, set_default_device
+from cntk.graph import find_by_name, plot
+from cntk.initializer import glorot_uniform
+from cntk.io import ReaderConfig, ImageDeserializer, CTFDeserializer
+from cntk.learner import momentum_sgd, learning_rate_schedule, momentum_as_time_constant_schedule
+from cntk.ops import input_variable, parameter, cross_entropy_with_softmax, classification_error, times, combine
+from cntk.ops import roipooling
+from cntk.ops.functions import CloneMethod
+from cntk.utils import log_number_of_parameters, ProgressPrinter
 
 
 
 ####################################
 # Region-of-interest
 ####################################
-def getSelectiveSearchRois(img, ssScale, ssSigma, ssMinSize, maxDim):
-    # Selective Search
-    #     Parameters
-    #     ----------
-    #         im_orig : ndarray
-    #             Input image
-    #         scale : int
-    #             Free parameter. Higher means larger clusters in felzenszwalb segmentation.
-    #         sigma : float
-    #             Width of Gaussian kernel for felzenszwalb segmentation.
-    #         min_size : int
-    #             Minimum component size for felzenszwalb segmentation.
-    #     Returns
-    #     -------
-    #         img : ndarray
-    #             image with region label
-    #             region label is stored in the 4th value of each pixel [r,g,b,(region)]
-    #         regions : array of dict
-    #             [
-    #                 {
-    #                     'rect': (left, top, right, bottom),
-    #                     'labels': [...]
-    #                 },
-    #                 ...
-    #             ]
-    #inter_area seems to give much better results esp when upscaling image
+def readRois(roiDir, subdir, imgFilename):
+    roiPath = join(roiDir, subdir, imgFilename[:-4] + ".roi.txt")
+    rois = np.loadtxt(roiPath, np.int)
+    if len(rois) == 4 and type(rois[0]) == np.int32:  # if only a single ROI in an image
+        rois = [rois]
+    return rois
+
+
+def findSelectiveSearchRois(img, kvals, minSize, max_merging_iterations, nmsThreshold):
+    tmp = []
+    dlib.find_candidate_object_locations(imconvertCv2Ski(img), tmp, kvals, minSize, max_merging_iterations)
+    rois = [[d.left(), d.top(), d.right(), d.bottom()] for d in tmp]
+
+    if nmsThreshold != None:
+        assert(nmsThreshold > 0 and nmsThreshold < 1)
+        dets = [ToFloats(r) + [abs((r[2] - r[0]) * (r[3] - r[1]))] for r in rois]
+        keepInds = nmsPython(np.array(dets), nmsThreshold)
+        #print("findSelectiveSearchRois using nms threshold: {}: before nms nrRois={}, after nms nrRois={}".format(nmsThreshold, len(rois), len(keepInds)))
+        #groupedRectangles, weights = cv2.groupRectangles(np.asanyarray(rectsInput, np.float).tolist(), 1, 0.3)
+        rois = [rois[i] for i in keepInds]
+    random.shuffle(rois) # randomize ROI order to not introduce any unintended effects later
+    return rois
+
+
+def findSelectiveSearchRois_old(img, maxDim = 200, ssScale = 100, ssSigma = 1.2, ssMinSize = 20):
+    # inter_area seems to give much better results esp when upscaling image
+    # from selectivesearch import selective_search
     img, scale = imresizeMaxDim(img, maxDim, boUpscale=True, interpolation = cv2.INTER_AREA)
-    _, ssRois = selectivesearch.selective_search(img, scale=ssScale, sigma=ssSigma, min_size=ssMinSize)
-    rects = []
+    _, ssRois = selective_search(img, scale=ssScale, sigma=ssSigma, min_size=ssMinSize)
+    rois = []
     for ssRoi in ssRois:
         x, y, w, h = ssRoi['rect']
-        rects.append([x,y,x+w,y+h])
-    return rects, img, scale
+        rois.append([x,y,x+w,y+h])
+    return rois, img, scale
 
 
 def getGridRois(imgWidth, imgHeight, nrGridScales, aspectRatios = [1.0], downscaleRatioPerIteration=2.0):
-    rects = []
-    #start adding large ROIs and then smaller ones
+    rois = []
+    # start adding large ROIs and then smaller ones
     for iter in range(nrGridScales):
         cellWidth = 1.0 * min(imgHeight, imgWidth) / (downscaleRatioPerIteration ** iter)
         step = cellWidth / 2.0
@@ -59,26 +77,27 @@ def getGridRois(imgWidth, imgHeight, nrGridScales, aspectRatios = [1.0], downsca
                 while hStart < imgHeight:
                     if aspectRatio < 1:
                         wEnd = wStart + cellWidth
-                        hEnd = hStart + cellWidth / aspectRatio
+                        hEnd = hStart + old_div(cellWidth, aspectRatio)
                     else:
                         wEnd = wStart + cellWidth * aspectRatio
                         hEnd = hStart + cellWidth
                     if wEnd < imgWidth-1 and hEnd < imgHeight-1:
-                        rects.append([wStart, hStart, wEnd, hEnd])
+                        rois.append([wStart, hStart, wEnd, hEnd])
                     hStart += step
                 wStart += step
-    return rects
+    return rois
 
 
-def filterRois(rects, maxWidth, maxHeight, roi_minNrPixels, roi_maxNrPixels,
+def filterRois(rois, maxWidth, maxHeight, roi_minNrPixels, roi_maxNrPixels,
                roi_minDim, roi_maxDim, roi_maxAspectRatio):
-    filteredRects = []
-    filteredRectsSet = set()
-    for rect in rects:
-        if tuple(rect) in filteredRectsSet: #excluding rectangles with same co-ordinates
+    filteredRois = []
+    filteredRoisSet = set()
+    for roi in rois:
+        key = tuple(roi)
+        if key in filteredRoisSet: # excluding rectangles with same co-ordinates
             continue
 
-        x, y, x2, y2 = rect
+        x, y, x2, y2 = roi
         w = x2 - x
         h = y2 - y
         assert(w>=0 and h>=0)
@@ -91,68 +110,80 @@ def filterRois(rects, maxWidth, maxHeight, roi_minNrPixels, roi_maxNrPixels,
            w * h < roi_minNrPixels or w * h > roi_maxNrPixels or \
            w / h > roi_maxAspectRatio or h / w > roi_maxAspectRatio:
                continue
-        filteredRects.append(rect)
-        filteredRectsSet.add(tuple(rect))
+        filteredRois.append(roi)
+        filteredRoisSet.add(key)
 
-    #could combine rectangles using non-maxima surpression or with similar co-ordinates
-    #groupedRectangles, weights = cv2.groupRectangles(np.asanyarray(rectsInput, np.float).tolist(), 1, 0.3)
-    #groupedRectangles = nms_python(np.asarray(rectsInput, np.float), 0.5)
-    assert(len(filteredRects) > 0)
-    return filteredRects
+    if len(filteredRois) == 0:
+        filteredRois = [[0,0,10,10]]
+
+    assert(len(filteredRois) > 0)
+    return filteredRois
 
 
-def readRois(roiDir, subdir, imgFilename):
-    roiPath = roiDir + subdir + "/" + imgFilename[:-4] + ".roi.txt"
-    rois = np.loadtxt(roiPath, np.int)
-    if len(rois) == 4 and type(rois[0]) == np.int32:  # if only a single ROI in an image
-        rois = [rois]
+def computeRois(imgOrig, boAddSelectiveSearchROIs, boAddGridROIs, boFilterROIs, ss_kvals, ss_minSize, ss_max_merging_iterations, ss_nmsThreshold,
+                roi_minDimRel, roi_maxDimRel, roi_maxImgDim, roi_maxAspectRatio, roi_minNrPixelsRel, roi_maxNrPixelsRel,
+                grid_nrScales, grid_aspectRatios, grid_downscaleRatioPerIteration, boVerbose = True):
+    # compute absolute pixel values
+    roi_minDim = roi_minDimRel * roi_maxImgDim
+    roi_maxDim = roi_maxDimRel * roi_maxImgDim
+    roi_minNrPixels = roi_minNrPixelsRel * roi_maxImgDim * roi_maxImgDim
+    roi_maxNrPixels = roi_maxNrPixelsRel * roi_maxImgDim * roi_maxImgDim
+
+    # get rois
+    if boAddSelectiveSearchROIs:
+        if boVerbose: print("Calling selective search..")
+        img, scale = imresizeMaxDim(imgOrig, roi_maxImgDim, boUpscale=True, interpolation=cv2.INTER_AREA)
+        rois = findSelectiveSearchRois(img, ss_kvals, ss_minSize, ss_max_merging_iterations, ss_nmsThreshold)
+        #rois, img, scale = findSelectiveSearchRois_old(imgOrig)  # previous selective search implementation
+        if boVerbose: print("   Number of rois detected using selective search: " + str(len(rois)))
+    else:
+        rois = []
+        img, scale = imresizeMaxDim(imgOrig, roi_maxImgDim, boUpscale=True, interpolation=cv2.INTER_AREA)
+    imgWidth, imgHeight = imWidthHeight(img)
+
+    # add grid rois
+    if boAddGridROIs:
+        roisGrid = getGridRois(imgWidth, imgHeight, grid_nrScales, grid_aspectRatios, grid_downscaleRatioPerIteration)
+        if boVerbose:
+            print("   Number of rois on grid added: " + str(len(roisGrid)))
+        rois += roisGrid
+
+    # run filter
+    if boFilterROIs:
+        if boVerbose: print("   Number of ROIs before filtering  = " + str(len(rois)))
+        rois = filterRois(rois, imgWidth, imgHeight, roi_minNrPixels, roi_maxNrPixels,
+                          roi_minDim, roi_maxDim, roi_maxAspectRatio)
+        if len(rois) == 0:  # make sure at least one roi returned per image
+            rois = [[5, 5, imgWidth - 5, imgHeight - 5]]
+        if boVerbose: print("   Number of ROIs after filtering  = " + str(len(rois)))
+
+    # scale up to original size and save to disk
+    # note: each rectangle is in original image format with [x,y,x2,y2]
+    rois = np.int32(np.array(rois) / scale)
+    assert (np.min(rois) >= 0)
+    assert (np.max(rois[:, [0, 2]]) < imWidth(imgOrig))
+    assert (np.max(rois[:, [1, 3]]) < imHeight(imgOrig))
     return rois
 
 
 
-
 ####################################
-# Generate and parse CNTK files
+# Generate CNTK inputs
 ####################################
 def readGtAnnotation(imgPath):
-    bboxesPath = imgPath[:-4] + ".bboxes.tsv"
+    roisPath = imgPath[:-4] + ".bboxes.tsv"
     labelsPath = imgPath[:-4] + ".bboxes.labels.tsv"
-    bboxes = np.array(readTable(bboxesPath), np.int32)
+    rois = np.array(readTable(roisPath), np.int32)
     labels = readFile(labelsPath)
-    assert (len(bboxes) == len(labels))
-    return bboxes, labels
+    assert (len(rois) == len(labels))
+    return rois, labels
 
 
-# def cropTransformRoiParams(imgWidth, imgHeight):
-#     mindim = np.min([imgWidth, imgHeight])
-#     maxdim = np.max([imgWidth, imgHeight])
-#     targetw = targeth = mindim
-#     cropOffset = 0.5 * (maxdim - mindim)
-#     boCropXDim = maxdim == w # compute if crop is horizontal or vertical
-#     return targetw, targeth, cropOffset, boCropXDim
-#
-#
-# def cropTransformRoi(rect, cropOffset, boCropXDim, targetImgDim):
-#   def offsetMinMax(val, maxVal, crop_offset):
-#       val = val - crop_offset
-#       val = max(0, val)
-#       return min(val, maxVal)
-#
-#     x, y, x2, y2 = np.asarray(rect)
-#     if boCropXDim:
-#         x  = offsetMinMax(x,  targetImgDim - 1, cropOffset)
-#         x2 = offsetMinMax(x2, targetImgDim - 1, cropOffset)
-#     else:
-#         y  = offsetMinMax(y,  targetImgDim - 1, cropOffset)
-#         y2 = offsetMinMax(y2, targetImgDim - 1, cropOffset)
-#     return [x, y, x2, y2]
-
-
-def getCntkInputPaths(cntkFilesDir, image_set):
-    cntkImgsListPath = cntkFilesDir + image_set + '.txt'
-    cntkRoiCoordsPath = cntkFilesDir + image_set + '.rois.txt'
-    cntkRoiLabelsPath = cntkFilesDir + image_set + '.roilabels.txt'
-    cntkNrRoisPath = cntkFilesDir + image_set + '.nrRois.txt'
+def cntkInputPaths(cntkFilesDir, image_set):
+    cntkImgsListPath  = join(cntkFilesDir, image_set + '.txt')
+    cntkRoiCoordsPath = join(cntkFilesDir, image_set + '.rois.txt')
+    cntkRoiLabelsPath = join(cntkFilesDir, image_set + '.roilabels.txt')
+    cntkNrRoisPath    = join(cntkFilesDir, image_set + '.nrRois.txt')
     return cntkImgsListPath, cntkRoiCoordsPath, cntkRoiLabelsPath, cntkNrRoisPath
 
 
@@ -166,28 +197,28 @@ def roiTransformPadScaleParams(imgWidth, imgHeight, padWidth, padHeight, boResiz
 
     targetw = padWidth
     targeth = padHeight
-    w_offset = ((targetw - imgWidth) / 2.)
-    h_offset = ((targeth - imgHeight) / 2.)
+    w_offset = ((targetw - imgWidth)  / 2.0)
+    h_offset = ((targeth - imgHeight) / 2.0)
     if boResizeImg and w_offset > 0 and h_offset > 0:
-        print "ERROR: both offsets are > 0:", imgCounter, imgWidth, imgHeight, w_offset, h_offset
+        print ("ERROR: both offsets are > 0:", imgCounter, imgWidth, imgHeight, w_offset, h_offset)
         error
     if (w_offset < 0 or h_offset < 0):
-        print "ERROR: at least one offset is < 0:", imgWidth, imgHeight, w_offset, h_offset, scale
+        print ("ERROR: at least one offset is < 0:", imgWidth, imgHeight, w_offset, h_offset, scale)
     return targetw, targeth, w_offset, h_offset, scale
 
 
-def roiTransformPadScale(rect, w_offset, h_offset, scale = 1.0):
-    rect = [int(round(scale * d)) for d in rect]
-    rect[0] += w_offset
-    rect[1] += h_offset
-    rect[2] += w_offset
-    rect[3] += h_offset
-    return rect
+def roiTransformPadScale(roi, w_offset, h_offset, scale = 1.0):
+    roi = [int(round(scale * d)) for d in roi]
+    roi[0] += w_offset
+    roi[1] += h_offset
+    roi[2] += w_offset
+    roi[3] += h_offset
+    return roi
 
 
-def getCntkRoiCoordsLine(rect, targetw, targeth):
-    #convert from absolute to relative co-ordinates
-    x, y, x2, y2 = rect
+def roiCntkRepresentation(roi, targetw, targeth):
+    # convert from absolute to relative co-ordinates
+    x, y, x2, y2 = roi
     xrel = float(x) / (1.0 * targetw)
     yrel = float(y) / (1.0 * targeth)
     wrel = float(x2 - x) / (1.0 * targetw)
@@ -196,13 +227,13 @@ def getCntkRoiCoordsLine(rect, targetw, targeth):
     assert yrel <= 1.0, "Error: yrel should be <= 1 but is " + str(yrel)
     assert wrel >= 0.0, "Error: wrel should be >= 0 but is " + str(wrel)
     assert hrel >= 0.0, "Error: hrel should be >= 0 but is " + str(hrel)
-    return " {} {} {} {}".format(xrel, yrel, wrel, hrel)
+    return (xrel, yrel, wrel, hrel)
 
 
-def getCntkRoiLabelsLine(overlaps, thres, nrClasses):
-    #get one hot encoding
+def roiCntkLabelsString(overlaps, thres, nrClasses):
+    # get one hot encoding
     maxgt = np.argmax(overlaps)
-    if overlaps[maxgt] < thres: #set to background label if small overlap with GT
+    if overlaps[maxgt] < thres: # set to background label if small overlap with GT
         maxgt = 0
     oneHot = np.zeros((nrClasses), dtype=int)
     oneHot[maxgt] = 1
@@ -210,30 +241,216 @@ def getCntkRoiLabelsLine(overlaps, thres, nrClasses):
     return oneHotString
 
 
-def cntkPadInputs(currentNrRois, targetNrRois, nrClasses, boxesStr, labelsStr):
-    assert currentNrRois <= targetNrRois, "Current number of rois ({}) should be <= target number of rois ({})".format(currentNrRois, targetNrRois)
-    while currentNrRois < targetNrRois:
-        boxesStr += " 0 0 0 0"
+def getCntkInputs(imgPath, currRois, currGtOverlaps, train_posOverlapThres, nrClasses, cntk_nrRois, cntk_padWidth, cntk_padHeight):
+    # all rois need to be scaled + padded to cntk input image size
+    imgWidth, imgHeight = imWidthHeight(imgPath)
+    targetw, targeth, w_offset, h_offset, scale = roiTransformPadScaleParams(
+        imgWidth, imgHeight, cntk_padWidth, cntk_padHeight)
+
+    # loop over all rois
+    roisStr = ""
+    labelsStr = ""
+    roisCntk = []
+    for roiIndex, roi in enumerate(currRois):
+        roiCntk = roiTransformPadScale(roi, w_offset, h_offset, scale)
+        roiCntk = roiCntkRepresentation(roiCntk, cntk_padWidth, cntk_padHeight)
+        roisCntk.append(roiCntk)
+        roisStr += " {} {} {} {}".format(*roiCntk) #xrel, yrel, wrel, hrel)
+        if currGtOverlaps != None:
+            labelsStr += roiCntkLabelsString(currGtOverlaps[roiIndex, :].toarray()[0], train_posOverlapThres, nrClasses)
+        else:
+            labelsStr += " 1" + " 0" * (nrClasses - 1)
+
+    # if less than e.g. 2000 rois per image, then fill in the rest using 'zero-padding'.
+    currentNrRois = len(currRois)
+    assert currentNrRois <= cntk_nrRois, "Current number of rois ({}) should be <= target number of rois ({})".format(currentNrRois, targetNrRois)
+    while currentNrRois < cntk_nrRois:
+        roisStr += " 0 0 0 0"
         labelsStr += " 1" + " 0" * (nrClasses - 1)
         currentNrRois += 1
-    return boxesStr, labelsStr
+    return labelsStr, roisStr, roisCntk
 
 
-def checkCntkOutputFile(cntkImgsListPath, cntkOutputPath, cntkNrRois, outputDim):
+
+####################################
+# CNTK-python wrapper functions
+####################################
+# Instantiates a composite minibatch source for reading images, roi coordinates and roi labels for training Fast R-CNN
+def create_mb_source(data_set, img_height, img_width, n_classes, n_rois, data_path, randomize):
+    # set paths
+    map_file   = join(data_path, data_set + '.txt')
+    roi_file   = join(data_path, data_set + '.rois.txt')
+    label_file = join(data_path, data_set + '.roilabels.txt')
+    if not os.path.exists(map_file) or not os.path.exists(roi_file) or not os.path.exists(label_file):
+        raise RuntimeError("File '%s', '%s' or '%s' does not exist. " % (map_file, roi_file, label_file))
+
+    # read images
+    nrImages = len(readTable(map_file))
+    image_source = ImageDeserializer(map_file)
+    image_source.ignore_labels()
+    image_source.map_features('features',
+                              [ImageDeserializer.scale(width=img_width, height=img_height, channels=3,
+                                                       scale_mode="pad", pad_value=114, interpolations='linear')])
+
+    # read rois and labels
+    rois_dim  = 4 * n_rois
+    label_dim = n_classes * n_rois
+    roi_source = CTFDeserializer(roi_file)
+    roi_source.map_input('rois', dim=rois_dim, format="dense")
+    label_source = CTFDeserializer(label_file)
+    label_source.map_input('roiLabels', dim=label_dim, format="dense")
+
+    # define a composite reader
+    rc = ReaderConfig([image_source, roi_source, label_source], epoch_size=sys.maxsize, randomize=randomize)
+    return (rc.minibatch_source(), nrImages)
+
+
+# Defines the Fast R-CNN network model for detecting objects in images
+def frcn_predictor(features, rois, n_classes, base_path):
+    # model specific variables for AlexNet
+    model_file = base_path + "/../../../resources/cntk/AlexNet.model"
+    roi_dim = 6
+    feature_node_name = "features"
+    last_conv_node_name = "conv5.y"
+    pool_node_name = "pool3"
+    last_hidden_node_name = "h2_d"
+
+    # Load the pretrained classification net and find nodes
+    print("Loading pre-trained model...")
+    loaded_model = load_model(model_file)
+    print("Loading pre-trained model... DONE.")
+    feature_node = find_by_name(loaded_model, feature_node_name)
+    conv_node    = find_by_name(loaded_model, last_conv_node_name)
+    pool_node    = find_by_name(loaded_model, pool_node_name)
+    last_node    = find_by_name(loaded_model, last_hidden_node_name)
+
+    # Clone the conv layers and the fully connected layers of the network
+    conv_layers = combine([conv_node.owner]).clone(CloneMethod.freeze, {feature_node: Placeholder()})
+    fc_layers   = combine([last_node.owner]).clone(CloneMethod.clone,  {pool_node: Placeholder()})
+
+    # Create the Fast R-CNN model
+    feat_norm = features - Constant(114)
+    conv_out  = conv_layers(feat_norm)
+    roi_out   = roipooling(conv_out, rois, (roi_dim, roi_dim))
+    fc_out    = fc_layers(roi_out)
+    #fc_out.set_name("fc_out")
+
+    # z = Dense(rois[0], num_classes, map_rank=1)(fc_out)  # --> map_rank=1 is not yet supported
+    W = parameter(shape=(4096, n_classes), init=glorot_uniform())
+    b = parameter(shape=n_classes, init=0)
+    z = times(fc_out, W) + b
+    return z, fc_out
+
+
+# Initialize and train a Fast R-CNN model
+def init_train_fast_rcnn(image_height, image_width, num_classes, num_rois, mb_size, max_epochs, cntk_lr_per_image, l2_reg_weight,
+                         momentum_time_constant, base_path, boSkipTraining = False, debug_output=False):
+
+    #make sure we use GPU for training
+    if default().type() == 0:
+        print("WARNING: using CPU for training.")
+    else:
+        print("Using GPU for training.")
+
+    # Instantiate the Fast R-CNN prediction model
+    image_input = input_variable((3, image_height, image_width))
+    roi_input   = input_variable((num_rois, 4))
+    label_input = input_variable((num_rois, num_classes))
+    frcn_output, frcn_penultimateLayer = frcn_predictor(image_input, roi_input, num_classes, base_path)
+
+    if boSkipTraining:
+        print("Using pre-trained DNN without refinement")
+        return frcn_penultimateLayer
+
+    # Create the minibatch source and define mapping from reader streams to network inputs
+    minibatch_source, epoch_size = create_mb_source("train", image_height, image_width, num_classes, num_rois,
+                                                    base_path, randomize=True)
+    input_map = {
+        image_input: minibatch_source['features'],
+        roi_input: minibatch_source['rois'],
+        label_input: minibatch_source['roiLabels']
+    }
+
+    # set loss / error functions
+    ce = cross_entropy_with_softmax(frcn_output, label_input, axis=1)
+    pe = classification_error(frcn_output, label_input, axis=1)
+    if debug_output:
+        plot(frcn_output, "graph_frcn.png")
+
+    # Set learning parameters and instantiate the trainer object
+    lr_per_sample = [f/float(num_rois) for f in cntk_lr_per_image]
+    lr_schedule = learning_rate_schedule(lr_per_sample, unit=UnitType.sample)
+    mm_schedule = momentum_as_time_constant_schedule(momentum_time_constant)
+    learner = momentum_sgd(frcn_output.parameters, lr_schedule, mm_schedule, l2_regularization_weight=l2_reg_weight)
+    trainer = Trainer(frcn_output, (ce, pe), learner)
+
+    # Get minibatches of images and perform model training
+    print("Training Fast R-CNN model for %s epochs." % max_epochs)
+    log_number_of_parameters(frcn_output)
+    progress_printer = ProgressPrinter(tag='Training', num_epochs=max_epochs)
+    for epoch in range(max_epochs):
+        sample_count = 0
+
+        # loop over minibatches in the epoch
+        while sample_count < epoch_size:
+            data = minibatch_source.next_minibatch(min(mb_size, epoch_size - sample_count), input_map=input_map)
+            if sample_count % 100 == 1:
+                print("Training in progress: epoch {} of {}, sample count {} of {}".format(epoch, max_epochs, sample_count, epoch_size))
+            trainer.train_minibatch(data)
+            sample_count += trainer.previous_minibatch_sample_count          # count samples processed so far
+            progress_printer.update_with_trainer(trainer, with_metric=True)  # log progress
+
+        progress_printer.epoch_summary(with_metric=True)
+        if debug_output:
+            frcn_output.save_model("frcn_py_%s.model" % (epoch + 1))
+
+    return frcn_output
+
+
+def run_fast_rcnn(model, data_set, image_height, image_width, num_classes, num_rois, base_path, outDir):
+    # Create the minibatch source and define mapping from reader streams to network inputs
+    minibatch_source, num_images = create_mb_source(data_set, image_height, image_width, num_classes, num_rois, base_path, randomize=False)
+    input_map = {
+        model.arguments[0]: minibatch_source['features'],
+        model.arguments[1]: minibatch_source['rois']
+    }
+
+    # evaluate test images and write to file
+    for imgIndex in range(0, num_images):
+        if imgIndex % 100 == 1:
+            print("Evaluating images {} of {}".format(imgIndex, num_images))
+        data = minibatch_source.next_minibatch(1, input_map=input_map)
+        output = model.eval(data)[0, 0]
+        output = np.array(output, np.float32)
+
+        # write to disk
+        if imgIndex % 100 == 1:
+            print("Writing DNN output of dimension {} to disk".format(output.shape))
+        outPath = outDir + str(imgIndex) + ".dat"
+        np.savez_compressed(outPath, output)
+
+
+
+####################################
+# Parse CNTK output and (for debugging)
+# also the CNTK input files
+####################################
+def verifyCntkOutput(cntkImgsListPath, cntkOutputPath):
     imgPaths = getColumn(readTable(cntkImgsListPath), 1)
     with open(cntkOutputPath) as fp:
         for imgIndex in range(len(imgPaths)):
             if imgIndex % 100 == 1:
-                print "Checking cntk output file, image %d of %d..." % (imgIndex, len(imgPaths))
+                print ("Checking cntk output file, image %d of %d..." % (imgIndex, len(imgPaths)))
+            #for roiIndex in range(cntkNrRois):
             assert (fp.readline() != "")
-        assert (fp.readline() == "") #test if end-of-file is reached
+        assert (fp.readline() == "") # test if end-of-file is reached
 
 
-#parse the cntk output file and save the output for each image individually
+# parse the cntk output file and save the output for each image individually
 def parseCntkOutput(cntkImgsListPath, cntkOutputPath, outParsedDir, cntkNrRois, outputDim,
                     saveCompressed = False, skipCheck = False, skip5Mod = None):
     if not skipCheck and skip5Mod == None:
-        checkCntkOutputFile(cntkImgsListPath, cntkOutputPath, cntkNrRois, outputDim)
+        verifyCntkOutput(cntkImgsListPath, cntkOutputPath)
 
     # parse cntk output and write file for each image
     # always read in data for each image to forward file pointer
@@ -242,9 +459,9 @@ def parseCntkOutput(cntkImgsListPath, cntkOutputPath, outParsedDir, cntkNrRois, 
         for imgIndex in range(len(imgPaths)):
             line = fp.readline()
             if skip5Mod != None and imgIndex % 5 != skip5Mod:
-                print "Skipping image {} (skip5Mod = {})".format(imgIndex, skip5Mod)
+                print("Skipping image {} (skip5Mod = {})".format(imgIndex, skip5Mod))
                 continue
-            print "Parsing cntk output file, image %d of %d" % (imgIndex, len(imgPaths))
+            print("Parsing cntk output file, image %d of %d" % (imgIndex, len(imgPaths)))
 
             # convert to floats
             data = []
@@ -267,48 +484,48 @@ def parseCntkOutput(cntkImgsListPath, cntkOutputPath, outParsedDir, cntkNrRois, 
         assert (fp.readline() == "")  # test if end-of-file is reached
 
 
-#parse the cntk labels file and return the labels
-def readCntkRoiLabels(roiLabelsPath, nrRois, roiDim, stopAtImgIndex = None):
+# parse the cntk labels file and return the labels
+def parseCntkRoiLabels(roiLabelsPath, nrRois, roiDim, stopAtImgIndex = None):
     roiLabels = []
     for imgIndex, line in enumerate(readFile(roiLabelsPath)):
         if stopAtImgIndex and imgIndex == stopAtImgIndex:
             break
         roiLabels.append([])
-        pos = line.find("|roiLabels ")
-        valuesString = line[pos + 10:].strip().split(" ")
+        pos = line.find('|roiLabels ')  #find(b'|roiLabels ')
+        valuesString = line[pos + 10:].strip().split(' ') #split(b' ')
         assert (len(valuesString) == nrRois * roiDim)
 
-        for boxIndex in range(nrRois):
-            oneHotLabels = [int(s) for s in valuesString[boxIndex*roiDim : (boxIndex+1)*roiDim]]
+        for roiIndex in range(nrRois):
+            oneHotLabels = [int(s) for s in valuesString[roiIndex*roiDim : (roiIndex+1)*roiDim]]
             assert(sum(oneHotLabels) == 1)
             roiLabels[imgIndex].append(np.argmax(oneHotLabels))
     return roiLabels
 
 
-#parse the cntk rois file and return the co-ordinates
-def readCntkRoiCoordinates(imgPaths, cntkRoiCoordsPath, nrRois, padWidth, padHeight, stopAtImgIndex = None):
+# parse the cntk rois file and return the co-ordinates
+def parseCntkRoiCoords(imgPaths, cntkRoiCoordsPath, nrRois, padWidth, padHeight, stopAtImgIndex = None):
     roiCoords = []
     for imgIndex, line in enumerate(readFile(cntkRoiCoordsPath)):
         if stopAtImgIndex and imgIndex == stopAtImgIndex:
             break
         roiCoords.append([])
-        pos = line.find("|rois ")
-        valuesString = line[pos + 5:].strip().split(" ")
+        pos = line.find("|rois ")  #find(b'|rois ') 
+        valuesString = line[pos + 5:].strip().split(' ') #split(b' ')
         assert (len(valuesString) == nrRois * 4)
 
         imgWidth, imgHeight = imWidthHeight(imgPaths[imgIndex])
-        for boxIndex in range(nrRois):
-            rect = [float(s) for s in valuesString[boxIndex*4 : (boxIndex+1)*4]]
-            x,y,w,h = rect
+        for roiIndex in range(nrRois):
+            roi = [float(s) for s in valuesString[roiIndex*4 : (roiIndex+1)*4]]
+            x,y,w,h = roi
             # convert back from padded-rois-co-ordinates to image co-ordinates
-            rect = getAbsoluteROICoordinates([x,y,x+w,y+h], imgWidth, imgHeight, padWidth, padHeight)
-            roiCoords[imgIndex].append(rect)
+            roi = convertCntkRoiToAbsCoords([x,y,x+w,y+h], imgWidth, imgHeight, padWidth, padHeight)
+            roiCoords[imgIndex].append(roi)
     return roiCoords
 
 
-#convert roi co-ordinates from CNTK file back to original image co-ordinates
-def getAbsoluteROICoordinates(roi, imgWidth, imgHeight, padWidth, padHeight, resizeMethod = 'padScale'):
-    if roi == [0,0,0,0]: #if padded roi
+# convert roi co-ordinates from CNTK file back to original image co-ordinates
+def convertCntkRoiToAbsCoords(roi, imgWidth, imgHeight, padWidth, padHeight, resizeMethod = 'padScale'):
+    if roi == [0,0,0,0]: # if padded roi
         return [0,0,0,0]
 
     if resizeMethod == "crop":
@@ -323,7 +540,7 @@ def getAbsoluteROICoordinates(roi, imgWidth, imgHeight, padWidth, padHeight, res
 
     elif resizeMethod == "pad" or resizeMethod == "padScale":
         if resizeMethod == "padScale":
-            scale = 1.0 * padWidth / max(imgWidth, imgHeight)
+            scale = float(padWidth) / max(imgWidth, imgHeight)
             imgWidthScaled  = int(round(imgWidth * scale))
             imgHeightScaled = int(round(imgHeight * scale))
         else:
@@ -331,28 +548,27 @@ def getAbsoluteROICoordinates(roi, imgWidth, imgHeight, padWidth, padHeight, res
             imgWidthScaled = imgWidth
             imgHeightScaled = imgHeight
 
-        w_offset = ((padWidth - imgWidthScaled) / 2.)
-        h_offset = ((padHeight - imgHeightScaled) / 2.)
+        w_offset = float(padWidth - imgWidthScaled)   / 2.0
+        h_offset = float(padHeight - imgHeightScaled) / 2.0
         if resizeMethod == "padScale":
             assert(w_offset == 0 or h_offset == 0)
         rect = [roi[0] * padWidth  - w_offset,
                 roi[1] * padHeight - h_offset,
                 roi[2] * padWidth  - w_offset,
                 roi[3] * padHeight - h_offset]
-        rect = [int(round(r / scale)) for r in rect]
+        rect = [int(round(old_div(r, scale))) for r in rect]
     else:
-        print "ERROR: Unknown resize method '%s'" % resizeMethod
+        print("ERROR: Unknown resize method '%s'" % resizeMethod)
         error
     assert(min(rect) >=0 and max(rect[0],rect[2]) <= imgWidth and max(rect[1],rect[3]) <= imgHeight)
     return rect
 
 
 
-
 ####################################
 # Classifier training / scoring
 ####################################
-def getSvmModelPaths(svmDir, experimentName):
+def svmModelPaths(svmDir, experimentName):
     svmWeightsPath   = "{}svmweights_{}.txt".format(svmDir, experimentName)
     svmBiasPath      = "{}svmbias_{}.txt".format(svmDir, experimentName)
     svmFeatScalePath = "{}svmfeature_scale_{}.txt".format(svmDir, experimentName)
@@ -360,7 +576,7 @@ def getSvmModelPaths(svmDir, experimentName):
 
 
 def loadSvm(svmDir, experimentName):
-    svmWeightsPath, svmBiasPath, svmFeatScalePath = getSvmModelPaths(svmDir, experimentName)
+    svmWeightsPath, svmBiasPath, svmFeatScalePath = svmModelPaths(svmDir, experimentName)
     svmWeights   = np.loadtxt(svmWeightsPath, np.float32)
     svmBias      = np.loadtxt(svmBiasPath, np.float32)
     svmFeatScale = np.loadtxt(svmFeatScalePath, np.float32)
@@ -368,70 +584,57 @@ def loadSvm(svmDir, experimentName):
 
 
 def saveSvm(svmDir, experimentName, svmWeights, svmBias, featureScale):
-    svmWeightsPath, svmBiasPath, svmFeatScalePath = getSvmModelPaths(svmDir, experimentName)
+    svmWeightsPath, svmBiasPath, svmFeatScalePath = svmModelPaths(svmDir, experimentName)
     np.savetxt(svmWeightsPath, svmWeights)
     np.savetxt(svmBiasPath, svmBias)
     np.savetxt(svmFeatScalePath, featureScale)
 
 
-def svmPredict(imgIndex, cntkOutputIndividualFilesDir, svmWeights, svmBias, svmFeatScale, roiSize, roiDim, decisionThreshold = 0):
-    cntkOutputPath = os.path.join(cntkOutputIndividualFilesDir,  str(imgIndex) + ".dat.npz")
-    data = np.load(cntkOutputPath)['arr_0']
-    assert(len(data) == roiSize)
-
-    #get prediction for each roi
-    labels = []
-    maxScores = []
-    for roiIndex in range(roiSize):
-        feat = data[roiIndex]
-        scores = np.dot(svmWeights, feat * 1.0 / svmFeatScale) + svmBias.ravel()
-        assert (len(scores) == roiDim)
-        maxArg = np.argmax(scores[1:]) + 1
-        maxScore = scores[maxArg]
-        if maxScore < decisionThreshold:
-            maxArg = 0
-        labels.append(maxArg)
-        maxScores.append(maxScore)
-    return labels, maxScores
-
-
-def nnPredict(imgIndex, cntkParsedOutputDir, roiSize, roiDim, decisionThreshold = None):
-    cntkOutputPath = os.path.join(cntkParsedOutputDir,  str(imgIndex) + ".dat.npz")
-    data = np.load(cntkOutputPath)['arr_0']
-    assert(len(data) == roiSize)
-
-    #get prediction for each roi
-    labels = []
-    maxScores = []
-    for roiIndex in range(roiSize):
-        scores = data[roiIndex]
-        scores = softmax(scores)
-        assert (len(scores) == roiDim)
+def scoreRoi(dnnOutput, classifier, roiDim, decisionThreshold, svmWeights = None, svmBias = None, svmFeatScale = None):
+    if classifier == 'svm':
+        scores = np.dot(svmWeights, dnnOutput * 1.0 / svmFeatScale) + svmBias.ravel()
+        maxArg = np.argmax(scores[1:]) + 1  # ignore label '0' since did not learn background svm
+    elif classifier == 'nn':
+        scores = softmax(dnnOutput)
         maxArg = np.argmax(scores)
-        maxScore = scores[maxArg]
-        if decisionThreshold and maxScore < decisionThreshold:
-            maxArg = 0
+    else:
+        error
+    assert (len(scores) == roiDim), "len(scores)={}, but expected {}".format(len(scores), roiDim)
+
+    maxScore = scores[maxArg]
+    if decisionThreshold != None and maxScore < decisionThreshold:
+        maxArg = 0
+        #maxScore = scores[maxArg]  # TODO: should this line here be uncommented?
+    return maxScore, maxArg
+
+
+def scoreRois(classifier, dnnOutputs, svmWeights, svmBias, svmFeatScale, roiDim, decisionThreshold = None):
+    roiSize = dnnOutputs.shape[0]
+    labels = []
+    maxScores = []
+    for roiIndex in range(roiSize):
+        maxScore, maxArg = scoreRoi(dnnOutputs[roiIndex], classifier, roiDim, decisionThreshold,
+                                    svmWeights, svmBias, svmFeatScale)
         labels.append(maxArg)
         maxScores.append(maxScore)
     return labels, maxScores
 
 
-def imdbUpdateRoisWithHighGtOverlap(imdb, positivesGtOverlapThreshold):
+def updateRoisGtClassIfHighGtOverlap(imdb, positivesGtOverlapThreshold):
     addedPosCounter = 0
     existingPosCounter = 0
     for imgIndex in range(imdb.num_images):
-        for boxIndex, gtLabel in enumerate(imdb.roidb[imgIndex]['gt_classes']):
+        for roiIndex, gtLabel in enumerate(imdb.roidb[imgIndex]['gt_classes']):
             if gtLabel > 0:
                 existingPosCounter += 1
             else:
-                overlaps = imdb.roidb[imgIndex]['gt_overlaps'][boxIndex, :].toarray()[0]
+                overlaps = imdb.roidb[imgIndex]['gt_overlaps'][roiIndex, :].toarray()[0]
                 maxInd = np.argmax(overlaps)
                 maxOverlap = overlaps[maxInd]
                 if maxOverlap >= positivesGtOverlapThreshold and maxInd > 0:
                     addedPosCounter += 1
-                    imdb.roidb[imgIndex]['gt_classes'][boxIndex] = maxInd
+                    imdb.roidb[imgIndex]['gt_classes'][roiIndex] = maxInd
     return existingPosCounter, addedPosCounter
-
 
 
 
@@ -441,7 +644,7 @@ def imdbUpdateRoisWithHighGtOverlap(imdb, positivesGtOverlapThreshold):
 def visualizeResults(imgPath, roiLabels, roiScores, roiRelCoords, padWidth, padHeight, classes,
                      nmsKeepIndices = None, boDrawNegativeRois = True, boDrawNmsRejectedRois = True,
                      decisionThreshold = 0.0):
-    #read and resize image
+    # read and resize image
     imgWidth, imgHeight = imWidthHeight(imgPath)
     scale = 800.0 / max(imgWidth, imgHeight)
     imgDebug = imresize(imread(imgPath), scale)
@@ -449,7 +652,7 @@ def visualizeResults(imgPath, roiLabels, roiScores, roiRelCoords, padWidth, padH
     if roiScores:
         assert(len(roiLabels) == len(roiScores))
 
-    #draw multiple times to avoid occlusions
+    # draw multiple times to avoid occlusions
     for iter in range(0,3):
         for roiIndex in range(len(roiRelCoords)):
             label = roiLabels[roiIndex]
@@ -458,7 +661,7 @@ def visualizeResults(imgPath, roiLabels, roiScores, roiRelCoords, padWidth, padH
                 if decisionThreshold and score < decisionThreshold:
                     label = 0
 
-            #init drawing parameters
+            # init drawing parameters
             thickness = 1
             if label == 0:
                 color = (255, 0, 0)
@@ -466,7 +669,7 @@ def visualizeResults(imgPath, roiLabels, roiScores, roiRelCoords, padWidth, padH
                 color = getColorsPalette()[label]
             rect = [int(scale * i) for i in roiRelCoords[roiIndex]]
 
-            #draw in higher iterations only the detections
+            # draw in higher iterations only the detections
             if iter == 0 and boDrawNegativeRois:
                 drawRectangles(imgDebug, [rect], color=color, thickness=thickness)
             elif iter==1 and label > 0:
@@ -484,18 +687,35 @@ def visualizeResults(imgPath, roiLabels, roiScores, roiRelCoords, padWidth, padH
     return imgDebug
 
 
+def imresizeAndPad(img, width, height, pad_value=114):
+    # resize image
+    imgWidth, imgHeight = imWidthHeight(img)
+    scale = min(float(width) / float(imgWidth), float(height) / float(imgHeight))
+    imgResized = imresize(img, scale) #, interpolation=cv2.INTER_NEAREST)
+    resizedWidth, resizedHeight = imWidthHeight(imgResized)
+
+    # pad image
+    top  = int(max(0, np.round((height - resizedHeight) / 2)))
+    left = int(max(0, np.round((width - resizedWidth) / 2)))
+    bottom = height - top - resizedHeight
+    right  = width - left - resizedWidth
+    return cv2.copyMakeBorder(imgResized, top, bottom, left, right,
+                              cv2.BORDER_CONSTANT, value=[pad_value, pad_value, pad_value])
+
+
+# compute nms for each label separately
 def applyNonMaximaSuppression(nmsThreshold, labels, scores, coords):
     # generate input for nms
     allIndices = []
-    nmsRects = [[[]] for _ in xrange(max(labels) + 1)]
+    nmsRois = [[[]] for _ in range(max(labels) + 1)]
     coordsWithScores = np.hstack((coords, np.array([scores]).T))
     for i in range(max(labels) + 1):
         indices = np.where(np.array(labels) == i)[0]
-        nmsRects[i][0] = coordsWithScores[indices,:]
+        nmsRois[i][0] = coordsWithScores[indices,:]
         allIndices.append(indices)
 
     # call nms
-    _, nmsKeepIndicesList = apply_nms(nmsRects, nmsThreshold)
+    _, nmsKeepIndicesList = apply_nms(nmsRois, nmsThreshold)
 
     # map back to original roi indices
     nmsKeepIndices = []
@@ -507,17 +727,15 @@ def applyNonMaximaSuppression(nmsThreshold, labels, scores, coords):
 
 
 def apply_nms(all_boxes, thresh, boUsePythonImpl = True):
-    """Apply non-maximum suppression to all predicted boxes output by the
-    test_net method.
-    """
+    """Apply non-maximum suppression to all predicted boxes output by the test_net method."""
     num_classes = len(all_boxes)
     num_images = len(all_boxes[0])
-    nms_boxes = [[[] for _ in xrange(num_images)]
-                 for _ in xrange(num_classes)]
-    nms_keepIndices = [[[] for _ in xrange(num_images)]
-                 for _ in xrange(num_classes)]
-    for cls_ind in xrange(num_classes):
-        for im_ind in xrange(num_images):
+    nms_boxes = [[[] for _ in range(num_images)]
+                 for _ in range(num_classes)]
+    nms_keepIndices = [[[] for _ in range(num_images)]
+                 for _ in range(num_classes)]
+    for cls_ind in range(num_classes):
+        for im_ind in range(num_images):
             dets = all_boxes[cls_ind][im_ind]
             if dets == []:
                 continue
@@ -553,28 +771,27 @@ def im_detect(net, im, boxes, feature_scale=None, bboxIndices=None, boReturnClas
     #     scores (ndarray): R x K array of object class scores (K includes
     #         background as object category 0)
     #     (optional) boxes (ndarray): R x (4*K) array of predicted bounding boxes
-    #load cntk output for the given image
-    cntkOutputPath = os.path.join(net.cntkParsedOutputDir, str(im) + ".dat.npz")
+    # load cntk output for the given image
+    cntkOutputPath = join(net.cntkParsedOutputDir, str(im) + ".dat.npz")
     cntkOutput = np.load(cntkOutputPath)['arr_0']
     if bboxIndices != None:
         cntkOutput = cntkOutput[bboxIndices, :] # only keep output for certain rois
     else:
         cntkOutput = cntkOutput[:len(boxes), :] # remove zero-padded rois
 
-    #compute scores for each box and each class
+    # compute scores for each box and each class
     scores = None
     if boReturnClassifierScore:
         if classifier == 'nn':
             scores = softmax2D(cntkOutput)
         elif classifier == 'svm':
-            svmBias = net.params['cls_score'][1].data.transpose()
+            svmBias    = net.params['cls_score'][1].data.transpose()
             svmWeights = net.params['cls_score'][0].data.transpose()
-            scores = np.dot(cntkOutput * 1.0 / feature_scale, svmWeights) + svmBias
+            scores     = np.dot(cntkOutput * 1.0 / feature_scale, svmWeights) + svmBias
             assert (np.unique(scores[:, 0]) == 0)  # svm always returns 0 for label 0
         else:
             error
     return scores, None, cntkOutput
-
 
 
 
@@ -614,18 +831,18 @@ def makeDirectory(directory):
         os.makedirs(directory)
 
 def getFilesInDirectory(directory, postfix = ""):
-    fileNames = [s for s in os.listdir(directory) if not os.path.isdir(directory+"/"+s)]
+    fileNames = [s for s in os.listdir(directory) if not os.path.isdir(join(directory, s))]
     if not postfix or postfix == "":
         return fileNames
     else:
         return [s for s in fileNames if s.lower().endswith(postfix)]
 
 def readFile(inputFile):
-    #reading as binary, to avoid problems with end-of-text characters
-    #note that readlines() does not remove the line ending characters
+    # reading as binary, to avoid problems with end-of-text characters
+    # note that readlines() does not remove the line ending characters
     with open(inputFile,'rb') as f:
         lines = f.readlines()
-    return [removeLineEndCharacters(s) for s in lines]
+    return [removeLineEndCharacters(s.decode('utf8')) for s in lines]
 
 def readTable(inputFile, delimiter='\t', columnsToKeep=None):
     lines = readFile(inputFile);
@@ -664,7 +881,7 @@ def deleteAllFilesInDirectory(directory, fileEndswithString, boPromptUser = Fals
         if boPromptUser:
             userInput = raw_input('--> INPUT: Press "y" to delete files in directory ' + directory + ": ")
             if not (userInput.lower() == 'y' or userInput.lower() == 'yes'):
-                print "User input is %s: exiting now." % userInput
+                print("User input is %s: exiting now." % userInput)
                 exit()
         for filename in getFilesInDirectory(directory):
             if fileEndswithString == None or filename.lower().endswith(fileEndswithString):
@@ -702,15 +919,15 @@ def sortDictionary(dictionary, sortIndex=0, reverseSort=False):
 
 def imread(imgPath, boThrowErrorIfExifRotationTagSet = True):
     if not os.path.exists(imgPath):
-        "ERROR: image path does not exist."
+        print("ERROR: image path does not exist.")
         error
 
     rotation = rotationFromExifTag(imgPath)
     if boThrowErrorIfExifRotationTagSet and rotation != 0:
-        print "Error: exif roation tag set, image needs to be rotated by %d degrees." % rotation
+        print("Error: exif roation tag set, image needs to be rotated by %d degrees." % rotation)
     img = cv2.imread(imgPath)
     if img is None:
-        print "ERROR: cannot load image " + imgPath
+        print("ERROR: cannot load image " + imgPath)
         error
     if rotation != 0:
         img = imrotate(img, -90).copy()  # got this error occassionally without copy "TypeError: Layout of the output array img is incompatible with cv::Mat"
@@ -724,19 +941,19 @@ def rotationFromExifTag(imgPath):
     except:
         imageExifTags = None
 
-    #rotate the image if orientation exif tag is present
+    # rotate the image if orientation exif tag is present
     rotation = 0
     if imageExifTags != None and orientationExifId != None and orientationExifId in imageExifTags:
         orientation = imageExifTags[orientationExifId]
-        #print "orientation = " + str(imageExifTags[orientationExifId])
+        #print ("orientation = " + str(imageExifTags[orientationExifId]))
         if orientation == 1 or orientation == 0:
-            rotation = 0 #no need to do anything
+            rotation = 0 # no need to do anything
         elif orientation == 6:
             rotation = -90
         elif orientation == 8:
             rotation = 90
         else:
-            print "ERROR: orientation = " + str(orientation) + " not_supported!"
+            print("ERROR: orientation = " + str(orientation) + " not_supported!")
             error
     return rotation
 
@@ -761,15 +978,15 @@ def imHeight(input):
     return imWidthHeight(input)[1]
 
 def imWidthHeight(input):
-    if type(input) is str or type(input) is unicode:
-        width, height = Image.open(input).size #this does not load the full image
+    if type(input) is str: #or type(input) is unicode:
+        width, height = Image.open(input).size # this does not load the full image
     else:
         width =  input.shape[1]
         height = input.shape[0]
     return width,height
 
 def imshow(img, waitDuration=0, maxDim = None, windowName = 'img'):
-    if isinstance(img, basestring): #test if 'img' is a string
+    if isinstance(img, str): # test if 'img' is a string
         img = cv2.imread(img)
     if maxDim is not None:
         scaleVal = 1.0 * maxDim / max(img.shape[:2])
@@ -838,13 +1055,18 @@ def imconvertCv2Pil(img):
     cv2_im = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
     return Image.fromarray(cv2_im)
 
+def imconvertCv2Ski(img):
+    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
 def ToIntegers(list1D):
     return [int(float(x)) for x in list1D]
 
-#TODO: implement numerically stable softmax
+def ToFloats(list1D):
+    return [float(x) for x in list1D]
+
 def softmax(vec):
     expVec = np.exp(vec)
-    #hack
+    # TODO: check numerical stability
     if max(expVec) == np.inf:
         outVec = np.zeros(len(expVec))
         outVec[expVec == np.inf] = vec[expVec == np.inf]
@@ -917,7 +1139,7 @@ class Bbox:
         else:
             return Bbox(overlapLeft, overlapTop, overlapRight, overlapBottom)
 
-    def standardize(self): #NOTE: every setter method should call standardize
+    def standardize(self): # NOTE: every setter method should call standardize
         leftNew   = min(self.left, self.right)
         topNew    = min(self.top, self.bottom)
         rightNew  = max(self.left, self.right)

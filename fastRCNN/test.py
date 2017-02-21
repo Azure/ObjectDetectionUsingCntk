@@ -9,11 +9,27 @@
 
 #from config import cfg #, get_output_dir
 #from blob import im_list_to_blob
-import os, cv2, numpy as np, cPickle, heapq
-import nms as nmsPython
-from nms import nms
-from timer import Timer
+from __future__ import print_function
+import os, sys, cv2, numpy as np, pickle as cp, heapq
+from .nms import nms as nmsPython
+from .timer import Timer
 from cntk_helpers import im_detect, apply_nms
+from builtins import range
+import pdb
+
+# if sys.version_info[0] < 3:
+#     from utils2_win64.cython_nms import nms
+# else:
+#     from .utils3_win64.cython_nms import nms
+
+if sys.version_info[1] == 4 and sys.version_info[0] == 3:
+    from .utils34_win64.cython_nms import nms
+elif sys.version_info[1] == 5 and sys.version_info[0] == 3:
+    from .utils35_win64.cython_nms import nms
+else:
+    print("ERROR: Python version {} not supported".format(sys.version_info))
+    error
+
 
 
 def _get_image_blob(im):
@@ -208,7 +224,7 @@ def vis_detections(im, class_name, dets, thresh=0.3):
     """Visual debugging of detections."""
     import matplotlib.pyplot as plt
     im = im[:, :, (2, 1, 0)]
-    for i in xrange(np.minimum(10, dets.shape[0])):
+    for i in range(np.minimum(10, dets.shape[0])):
         bbox = dets[i, :4]
         score = dets[i, -1]
         if score > thresh:
@@ -223,8 +239,26 @@ def vis_detections(im, class_name, dets, thresh=0.3):
             plt.title('{}  {:.3f}'.format(class_name, score))
             plt.show()
 
+
+
+# TODO: MOVE THIS TO CNTK HELPERS
+# def test_net_noThreshold():
+#     #boxes = roidb[i]['boxes']
+#     scores, _, _ = im_detect(net, i, boxes, feature_scale=feature_scale, classifier=classifier)
+#
+#     for j in range(1, imdb.num_classes):
+#         inds = np.where(roidb[i]['gt_classes'] == 0)[0]
+#         cls_scores = scores[inds, j]
+#         cls_boxes = roidb[i]['boxes'][inds]
+#         all_boxes[j][i] = \
+#             np.hstack((cls_boxes, cls_scores[:, np.newaxis])) \
+#                 .astype(np.float32, copy=False)
+#
+
+
 def test_net(net, imdb, output_dir, feature_scale, classifier = 'svm', nmsThreshold = 0.3,
-             boUsePythonImpl = False, boThresholdDetections = True, boApplyNms = True):
+             boUsePythonImpl = False, boThresholdDetections = True, boApplyNms = True,
+             overlapThreshold=0.5):
     """Test a Fast R-CNN network on an image database."""
     num_images = len(imdb.image_index)
     # heuristic: keep an average of 40 detections per class per images prior
@@ -237,12 +271,12 @@ def test_net(net, imdb, output_dir, feature_scale, classifier = 'svm', nmsThresh
     thresh = -np.inf * np.ones(imdb.num_classes)
     # top_scores will hold one minheap of scores per class (used to enforce
     # the max_per_set constraint)
-    top_scores = [[] for _ in xrange(imdb.num_classes)]
+    top_scores = [[] for _ in range(imdb.num_classes)]
     # all detections are collected into:
     #    all_boxes[cls][image] = N x 5 array of detections in
     #    (x1, y1, x2, y2, score)
-    all_boxes = [[[] for _ in xrange(num_images)]
-                 for _ in xrange(imdb.num_classes)]
+    all_boxes = [[[] for _ in range(num_images)]
+                 for _ in range(imdb.num_classes)]
 
     #output_dir = get_output_dir(imdb, net)
 
@@ -251,12 +285,12 @@ def test_net(net, imdb, output_dir, feature_scale, classifier = 'svm', nmsThresh
     roidb = imdb.roidb
 
     if not boThresholdDetections:
-        for i in xrange(num_images):
+        for i in range(num_images):
             if i % 100 == 0:
-                print "   Processing image {} of {}..".format(i, num_images)
+                print ("   Processing image {} of {}..".format(i, num_images))
             scores, _, _ = im_detect(net, i, roidb[i]['boxes'], feature_scale=feature_scale, classifier=classifier)
 
-            for j in xrange(1, imdb.num_classes):
+            for j in range(1, imdb.num_classes):
                 inds = np.where(roidb[i]['gt_classes'] == 0)[0]
                 cls_scores = scores[inds, j]
                 cls_boxes = roidb[i]['boxes'][inds]
@@ -265,16 +299,17 @@ def test_net(net, imdb, output_dir, feature_scale, classifier = 'svm', nmsThresh
                         .astype(np.float32, copy=False)
 
     else:
-        for i in xrange(num_images):
+        for i in range(num_images):
             if i % 100 == 0:
-                print "   Processing image {} of {}..".format(i, num_images)
+                print ("   Processing image {} of {}..".format(i, num_images))
             #im = cv2.imread(imdb.image_path_at(i))
             #_t['im_detect'].tic()
             scores, _, _ = im_detect(net, i, roidb[i]['boxes'], feature_scale = feature_scale, classifier = classifier)
             #_t['im_detect'].toc()
 
             _t['misc'].tic()
-            for j in xrange(1, imdb.num_classes):
+            for j in range(1, imdb.num_classes):
+                #only get detections with high scores AND exclude ground truth ROIs
                 inds = np.where((scores[:, j] > thresh[j]) &
                                 (roidb[i]['gt_classes'] == 0))[0]
                 cls_scores = scores[inds, j]
@@ -301,23 +336,29 @@ def test_net(net, imdb, output_dir, feature_scale, classifier = 'svm', nmsThresh
                         .astype(np.float32, copy=False)
 
                 #visualize rois
-                if False:
+                if False and i == 6 and j == 15:
                     im = cv2.imread(imdb.image_path_at(i))
                     if boUsePythonImpl:
-                        keep = nmsPython.nms(all_boxes[j][i], 0.3)
+                        nms_boxes, nms_keepIndices = apply_nms(all_boxes, nmsThreshold, boUsePythonImpl = True)
+                        keep = nms_keepIndices[j][i]
                     else:
                         keep = nms(all_boxes[j][i], 0.3)
-                    vis_detections(im, imdb.classes[j], all_boxes[j][i][keep, :])
+                    #vis_detections(im, imdb.classes[j], all_boxes[j][i])
+                    vis_detections(im, imdb.classes[j], all_boxes[j][i][keep, :]) #, thres=-10.0)
             _t['misc'].toc()
 
-            # print 'im_detect: {:d}/{:d} {:.3f}s {:.3f}s' \
+            # print ('im_detect: {:d}/{:d} {:.3f}s {:.3f}s' \
             #       .format(i + 1, num_images, _t['im_detect'].average_time,
-            #               _t['misc'].average_time)
+            #               _t['misc'].average_time))
+
+        # for j in range(1, imdb.num_classes):
+        #     thresh[j] = max(0.5, thresh[j])
+        #     print("thresh[{}] = {}".format(j, thresh[j]))
 
         #keep only the boxes with highest score for each class
         #   shape of all_boxes: e.g. 21 classes x 4952 images x 58 rois x 5 coord+score
-        for j in xrange(1, imdb.num_classes):
-            for i in xrange(num_images):
+        for j in range(1, imdb.num_classes):
+            for i in range(num_images):
                 inds = np.where(all_boxes[j][i][:, -1] > thresh[j])[0]
                 if len(inds) == 0:
                     all_boxes[j][i] = []
@@ -327,15 +368,15 @@ def test_net(net, imdb, output_dir, feature_scale, classifier = 'svm', nmsThresh
     if output_dir:
         det_file = os.path.join(output_dir, 'detections.pkl')
         with open(det_file, 'wb') as f:
-            cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
+            cp.dump(all_boxes, f, cp.HIGHEST_PROTOCOL)
 
     if boApplyNms:
-        print "Number of rois before non-maxima surpression: %d" % sum([len(all_boxes[i][j]) for i in range(imdb.num_classes) for j in range(imdb.num_images)])
+        print ("Number of rois before non-maxima surpression: %d" % sum([len(all_boxes[i][j]) for i in range(imdb.num_classes) for j in range(imdb.num_images)]))
         nms_dets,_ = apply_nms(all_boxes, nmsThreshold, boUsePythonImpl)
-        print "Number of rois  after non-maxima surpression: %d" % sum([len(nms_dets[i][j]) for i in range(imdb.num_classes) for j in range(imdb.num_images)])
+        print ("Number of rois  after non-maxima surpression: %d" % sum([len(nms_dets[i][j]) for i in range(imdb.num_classes) for j in range(imdb.num_images)]))
     else:
-        print "Skipping non-maxima surpression"
+        print ("Skipping non-maxima surpression")
         nms_dets = all_boxes
 
-    print 'Evaluating detections'
-    imdb.evaluate_detections(nms_dets, output_dir)
+    print ('Evaluating detections')
+    imdb.evaluate_detections(nms_dets, output_dir, overlapThreshold)

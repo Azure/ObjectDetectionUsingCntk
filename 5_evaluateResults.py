@@ -14,11 +14,11 @@ svmExperimentName = "exp1"
 cntkParsedOutputDir = cntkFilesDir + image_set + "_" + classifier + "_parsed/"
 
 
-
 ####################################
 # Main
 ####################################
-print "classifier = " + classifier
+print("classifier = " + classifier)
+print("image_set = " + image_set)
 imdb = imdbs[image_set]
 net = DummyNet(4096, imdb.num_classes, cntkParsedOutputDir)
 
@@ -39,6 +39,6 @@ else:
     deleteAllFilesInDirectory(evalTempDir, None)
 
 #compute mAPs
-test_net(net, imdb, evalTempDir, svmFeatScale, classifier, nmsThreshold, boUsePythonImpl = True) #, boApplyNms = False) #, boThresholdDetections = False)
+test_net(net, imdb, evalTempDir, svmFeatScale, classifier, nmsThreshold, boUsePythonImpl = True) #, overlapThreshold = 0.5) #, boApplyNms = False) #, boThresholdDetections = False)
 
-print "DONE."
+print("DONE.")

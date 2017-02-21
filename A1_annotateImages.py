@@ -3,7 +3,6 @@ import PARAMETERS
 locals().update(importlib.import_module("PARAMETERS").__dict__)
 
 
-
 ####################################
 # Parameters
 ####################################
@@ -47,6 +46,7 @@ def event_cv2GetRectangles(event, x, y, flags, param):
         drawCrossbar(imgCopy, (x, y))
     cv2.imshow("image", imgCopy)
 
+
 def procBoundingBoxes(rectsIn, imageUnscaled, scaleFactor):
     if len(rectsIn) <= 0:
         return rectsIn
@@ -64,14 +64,13 @@ def procBoundingBoxes(rectsIn, imageUnscaled, scaleFactor):
 
 
 
-
 ####################################
 # Main
 ####################################
 makeDirectory(resultsDir)
 imgFilenames = [f for f in os.listdir(imagesToAnnotateDir) if f.lower().endswith(".jpg")]
 
-print "Using annotations file: " + annotationsFile
+print("Using annotations file: " + annotationsFile)
 if annotationsFile and os.path.exists(annotationsFile):
     shutil.copyfile(annotationsFile, annotationsFile + ".backup.tsv")
     data = readTable(annotationsFile)
@@ -82,22 +81,22 @@ else:
 
 #loop over each image and get annotation
 for imgFilenameIndex,imgFilename in enumerate(imgFilenames):
-    print imgFilenameIndex,imgFilename
+    print("imgFilenameIndex = {}, imgFilename = {}".format(imgFilenameIndex, imgFilename))
     imgPath = imagesToAnnotateDir + imgFilename
-    print "Processing image {0} of {1}: {2}".format(imgFilenameIndex, len(imgFilenames), imgPath)
+    print("Processing image {0} of {1}: {2}".format(imgFilenameIndex, len(imgFilenames), imgPath))
     bBoxPath = imgPath[:-4] + ".bboxes.tsv"
 
     #compute scale factor
     imgWidth, imgHeight = imWidthHeight(imgPath)
     scaleFactor = min(1, drawingMaxImgSize / max(imgWidth, imgHeight))
     if imgWidth * imgHeight < minNrPixels:
-        print "Low resolution ({0},{1}) hence skipping image: {2}.".format(imgWidth, imgHeight, imgPath)
+        print("Low resolution ({0},{1}) hence skipping image: {2}.".format(imgWidth, imgHeight, imgPath))
         continue
 
     #load existing ground truth if provided
     cv2GetRectangle_global_bboxes = []
     if os.path.exists(bBoxPath):
-        print "Skipping image since ground truth already exists: %s." % imgPath
+        print("Skipping image since ground truth already exists: %s." % imgPath)
         continue
 
     #draw image
@@ -109,15 +108,14 @@ for imgFilenameIndex,imgFilename in enumerate(imgFilenames):
     drawRectangles(imgCopy, cv2GetRectangle_global_bboxes)
     cv2.imshow("image", imgCopy)
 
-
     #wait for user input
     while True:
-        key = unichr(cv2.waitKey()) #& 0xFF
+        key = chr(cv2.waitKey()) #& 0xFF
 
         #skip
         if key == "s":
             if os.path.exists(bBoxPath):
-                print "Skipping image hence deleting existing bbox file: " + bBoxPath
+                print("Skipping image hence deleting existing bbox file: " + bBoxPath)
                 os.remove(bBoxPath)
             annotationsLUT[imgPath] = "skip"
             if annotationsFile:
@@ -146,4 +144,4 @@ for imgFilenameIndex,imgFilename in enumerate(imgFilenames):
             sys.exit()
 
 cv2.destroyAllWindows()
-print "DONE."
+print("DONE.")

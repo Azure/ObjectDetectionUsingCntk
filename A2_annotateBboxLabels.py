@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import cv2, os, sys, time, importlib
-from Tkinter import *
+from tkinter import *
 from PIL import ImageTk
 import PARAMETERS
 locals().update(importlib.import_module("PARAMETERS").__dict__)
@@ -18,7 +18,6 @@ drawingMaxImgSize = 1000
 objectNames = classes[1:]
 objectNames = np.sort(objectNames).tolist()
 objectNames += ["UNDECIDED", "EXCLUDE"]
-
 
 
 
@@ -48,14 +47,14 @@ for objectIndex,objectName in enumerate(objectNames):
 #loop over all images
 imgFilenames = getFilesInDirectory(imagesToAnnotateDir, ".jpg")
 for imgIndex, imgFilename in enumerate(imgFilenames):
-    print imgIndex, imgFilename
+    print("imgIndex={}, imgFilename={}".format(imgIndex, imgFilename))
     labelsPath = imagesToAnnotateDir + "/" + imgFilename[:-4] + ".bboxes.labels.tsv"
     if os.path.exists(labelsPath):
         continue
 
     #load image and bboxes
     imgPath = imagesToAnnotateDir + "/" + imgFilename
-    print imgIndex, imgPath
+    print("imgIndex = {}, imgPath = {}".format(imgIndex, imgPath))
     img = imread(imgPath)
     rectsPath = imgPath = imagesToAnnotateDir + "/" + imgFilename[:-4] + ".bboxes.tsv"
     rects = readTable(rectsPath)
@@ -84,9 +83,9 @@ for imgIndex, imgFilename in enumerate(imgFilenames):
             tk.update()
 
         #store result
-        print "tkLastButtonPressed", tkLastButtonPressed
+        print("tkLastButtonPressed", tkLastButtonPressed)
         labels.append(tkLastButtonPressed)
 
     writeFile(labelsPath, labels)
 tk.destroy()
-print "DONE."
+print("DONE.")

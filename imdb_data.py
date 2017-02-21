@@ -1,8 +1,17 @@
+# --------------------------------------------------------
+# Fast R-CNN
+# Copyright (c) 2015 Microsoft
+# Licensed under The MIT License [see LICENSE for details]
+# Written by Ross Girshick
+# --------------------------------------------------------
+
+from __future__ import print_function
+from builtins import range
 import sys, os
 from cntk_helpers import *
 import scipy.sparse
 import scipy.io as sio
-import cPickle
+import pickle as cp
 import numpy as np
 import fastRCNN
 
@@ -17,7 +26,7 @@ class imdb_data(fastRCNN.imdb):
         self._cacheDir = cacheDir #cache_path
         self._imgSubdirs ={'train': ['positive', 'negative'], 'test': ['testImages']}
         self._classes = classes
-        self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
+        self._class_to_ind = dict(zip(self.classes, range(self.num_classes)))
         self._image_ext = '.jpg'
         self._image_index, self._image_subdirs = self._load_image_set_index()
         self._roidb_handler = self.selective_search_roidb
@@ -29,52 +38,70 @@ class imdb_data(fastRCNN.imdb):
     def cache_path(self):
         return self._cacheDir
 
-    #Return the absolute path to image i in the image sequence.
     def image_path_at(self, i):
+        """
+        Return the absolute path to image i in the image sequence.
+        """
         return self.image_path_from_index(self._image_subdirs[i], self._image_index[i])
 
-    #Construct an image path from the image's "index" identifier.
     def image_path_from_index(self, subdir, fname):
+        """
+        Construct an image path from the image's "index" identifier.
+        """
         image_path = os.path.join(self._imgDir, subdir, fname)
         assert os.path.exists(image_path), \
                 'Path does not exist: {}'.format(image_path)
         return image_path
 
-    #Compile list of image indices and the subdirectories they are in.
     def _load_image_set_index(self):
+        """
+        Compile list of image indices and the subdirectories they are in.
+        """
         image_index = []
         image_subdirs = []
         for subdir in self._imgSubdirs[self._image_set]:
-            imgFilenames = getFilesInDirectory(self._imgDir + subdir, self._image_ext)
+            imgFilenames = getFilesInDirectory(os.path.join(self._imgDir,subdir), self._image_ext)
             image_index += imgFilenames
             image_subdirs += [subdir] * len(imgFilenames)
         return image_index, image_subdirs
 
-    #Return the database of ground-truth regions of interest.
     def gt_roidb(self):
+        """
+        Return the database of ground-truth regions of interest.
+
+        This function loads/saves from/to a cache file to speed up future calls.
+        """
         cache_file = os.path.join(self.cache_path, self.name + '_gt_roidb.pkl')
         if os.path.exists(cache_file):
             with open(cache_file, 'rb') as fid:
-                roidb = cPickle.load(fid)
-            print '{} gt roidb loaded from {}'.format(self.name, cache_file)
+                roidb = cp.load(fid)
+            print ('{} gt roidb loaded from {}'.format(self.name, cache_file))
             return roidb
 
         gt_roidb = [self._load_annotation(i) for i in range(self.num_images)]
         with open(cache_file, 'wb') as fid:
-            cPickle.dump(gt_roidb, fid, cPickle.HIGHEST_PROTOCOL)
-        print 'wrote gt roidb to {}'.format(cache_file)
+            cp.dump(gt_roidb, fid, cp.HIGHEST_PROTOCOL)
+        print ('wrote gt roidb to {}'.format(cache_file))
 
         return gt_roidb
 
-    #Return the database of selective search regions of interest. Ground-truth ROIs are also included.
     def selective_search_roidb(self):
+        """
+        Return the database of selective search regions of interest.
+        Ground-truth ROIs are also included.
+
+        This function loads/saves from/to a cache file to speed up future calls.
+        """
         cache_file = os.path.join(self.cache_path,
                                   self.name + '_selective_search_roidb.pkl')
 
         if os.path.exists(cache_file):
             with open(cache_file, 'rb') as fid:
-                roidb = cPickle.load(fid)
-            print '{} ss roidb loaded from {}'.format(self.name, cache_file)
+                if sys.version_info[0] < 3: 
+                    roidb = cp.load(fid)
+                else: 
+                    roidb = cp.load(fid, encoding='latin1')
+            print ('{} ss roidb loaded from {}'.format(self.name, cache_file))
             return roidb
 
         gt_roidb = self.gt_roidb()
@@ -88,8 +115,8 @@ class imdb_data(fastRCNN.imdb):
 
         #Keep max of e.g. 2000 rois
         if self._maxNrRois and self._maxNrRois > 0:
-            print "Only keeping the first %d ROIs.." % self._maxNrRois
-            for i in xrange(self.num_images):
+            print ("Only keeping the first %d ROIs.." % self._maxNrRois)
+            for i in range(self.num_images):
                 gt_overlaps = roidb[i]['gt_overlaps']
                 gt_overlaps = gt_overlaps.todense()[:self._maxNrRois]
                 gt_overlaps = scipy.sparse.csr_matrix(gt_overlaps)
@@ -98,8 +125,8 @@ class imdb_data(fastRCNN.imdb):
                 roidb[i]['gt_classes'] = roidb[i]['gt_classes'][:self._maxNrRois]
 
         with open(cache_file, 'wb') as fid:
-            cPickle.dump(roidb, fid, cPickle.HIGHEST_PROTOCOL)
-        print 'wrote ss roidb to {}'.format(cache_file)
+            cp.dump(roidb, fid, cp.HIGHEST_PROTOCOL)
+        print ('wrote ss roidb to {}'.format(cache_file))
 
         return roidb
 
@@ -114,6 +141,9 @@ class imdb_data(fastRCNN.imdb):
         return self.create_roidb_from_box_list(box_list, gt_roidb)
 
     def _load_annotation(self, imgIndex):
+        """
+        Load image and bounding boxes info from human annotations.
+		"""
         #negative images do not have any ground truth annotations
         if self._image_subdirs[imgIndex].lower() == "negative":
             return None
@@ -125,9 +155,12 @@ class imdb_data(fastRCNN.imdb):
         assert os.path.exists(labelsPaths), "Error: ground truth labels file not found: " + bboxesPaths
         bboxes = np.loadtxt(bboxesPaths, np.float32)
         labels = readFile(labelsPaths)
-        if len(bboxes)>0 and type(bboxes[0]) == np.float32: #if only a single ground truth box was loaded
-            bboxes = [bboxes]
 
+        # in case there's only one annotation and numpy read the array as single array,
+        # we need to make sure the input is treated as a multi dimensional array instead of a list/ 1D array
+        #if len(bboxes.shape) == 1:
+        if len(bboxes)>0 and type(bboxes[0]) == np.float32:
+            bboxes = np.array([bboxes])
 
         #remove boxes marked as 'undecided' or 'exclude'
         indicesToKeep = find(labels, lambda x: x!='EXCLUDE' and x!='UNDECIDED')
@@ -140,7 +173,7 @@ class imdb_data(fastRCNN.imdb):
         gt_classes = np.zeros(num_objs, dtype=np.int32)
         overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
         for bboxIndex,(bbox,label) in enumerate(zip(bboxes,labels)):
-            cls = self._class_to_ind[label]
+            cls = self._class_to_ind[label] #.decode('utf-8')]
             boxes[bboxIndex, :] = bbox
             gt_classes[bboxIndex] = cls
             overlaps[bboxIndex, cls] = 1.0
@@ -155,16 +188,22 @@ class imdb_data(fastRCNN.imdb):
     # main call to compute per-calass average precision
     #   shape of all_boxes: e.g. 21 classes x 4952 images x 58 rois x 5 coords+score
     #  (see also test_net() in fastRCNN\test.py)
-    def evaluate_detections(self, all_boxes, output_dir, use_07_metric=False):
+    def evaluate_detections(self, all_boxes, output_dir, use_07_metric=False, overlapThreshold = 0.5):
         aps = []
         for classIndex, className in enumerate(self._classes):
             if className != '__background__':
-                rec, prec, ap = self._evaluate_detections(classIndex, all_boxes, use_07_metric = use_07_metric)
+                rec, prec, ap = self._evaluate_detections(classIndex, all_boxes, use_07_metric, overlapThreshold)
                 aps += [ap]
                 print('AP for {:>15} = {:.4f}'.format(className, ap))
         print('Mean AP = {:.4f}'.format(np.nanmean(aps)))
 
-    def _evaluate_detections(self, classIndex, all_boxes, overlapThreshold = 0.5, use_07_metric = False):
+    def _evaluate_detections(self, classIndex, all_boxes, use_07_metric = False, overlapThreshold = 0.5):
+        """
+        Top level function that does the PASCAL VOC evaluation.
+
+        [overlapThreshold]: Overlap threshold (default = 0.5)
+        [use_07_metric]: Whether to use VOC07's 11 point AP computation (default False)
+        """
         assert (len(all_boxes) == self.num_classes)
         assert (len(all_boxes[0]) == self.num_images)
 
@@ -175,7 +214,7 @@ class imdb_data(fastRCNN.imdb):
             imgSubir  = os.path.normpath(imgPath).split(os.path.sep)[-2]
             if imgSubir != 'negative':
                 gtBoxes, gtLabels = readGtAnnotation(imgPath)
-                gtBoxes = [box for box, label in zip(gtBoxes, gtLabels) if label == self.classes[classIndex]]
+                gtBoxes = [box for box, label in zip(gtBoxes, gtLabels) if label == self.classes[classIndex]]  #.decode('utf-8')
             else:
                 gtBoxes = []
             gtInfos.append({'bbox': np.array(gtBoxes),
@@ -190,13 +229,26 @@ class imdb_data(fastRCNN.imdb):
         for imgIndex in range(self.num_images):
             dets = all_boxes[classIndex][imgIndex]
             if dets != []:
-                for k in xrange(dets.shape[0]):
+                for k in range(dets.shape[0]):
                     detImgIndices.append(imgIndex)
                     detConfidences.append(dets[k, -1])
                     # the VOCdevkit expects 1-based indices
                     detBboxes.append([dets[k, 0] + 1, dets[k, 1] + 1, dets[k, 2] + 1, dets[k, 3] + 1])
         detBboxes = np.array(detBboxes)
         detConfidences = np.array(detConfidences)
+
+        # debug: visualize GT and detections
+        # if classIndex == 15: # and imgPath.endswith("WIN_20160803_11_42_36_Pro.jpg"):
+        #     imgIndex = 6
+        #     imgPath = self.image_path_at(imgIndex)
+        #     img = imread(imgPath)
+        #     tmp_gtBoxes = gtInfos[imgIndex]['bbox']
+        #     inds = np.where(np.array(detImgIndices) == 1)[0]
+        #     tmp_detBoxes = detBboxes[inds]
+        #     print(detConfidences[inds])
+        #     drawRectangles(img, tmp_gtBoxes, color = (255, 0, 0)) #thickness=thickness)
+        #     drawRectangles(img, tmp_detBoxes, color= (0, 255, 0))  # thickness=thickness)
+        #     imshow(img, maxDim=800)
 
         # compute precision / recall / ap
         rec, prec, ap = self._voc_computePrecisionRecallAp(
@@ -206,6 +258,7 @@ class imdb_data(fastRCNN.imdb):
             BB=detBboxes,
             ovthresh=overlapThreshold,
             use_07_metric=use_07_metric)
+
         return rec, prec, ap
 
 
