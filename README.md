@@ -4,8 +4,8 @@ Fast R-CNN Object Detection Tutorial for Microsoft Cognitive Toolkit (CNTK)
 
 ```diff
 + Update v1 (Feb 2017):
-+ This tutorial was updated to use CNTK's python wrappers. Now all processing happens in-memory during scoring. See script 6_runSingleImage for an example. Furthermore, we switched to a much more accurate and faster implementation of Selective Search. <br>
-Note that, at the time of writing, CNTK does not support Python 2. If you need Python 2 then please refer to the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
++ This tutorial was updated to use CNTK's python wrappers. Now all processing happens in-memory during scoring. See script 6_runSingleImage for an example. Furthermore, we switched to a much more accurate and faster implementation of Selective Search.
++ Note that, at the time of writing, CNTK does not support Python 2. If you need Python 2 then please refer to the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
 ```
 
 DESCRIPTION
@@ -327,9 +327,10 @@ The evaluation script `5_evaluateResults.py` can be used to verify that the SVM 
 
 ### Publishing the model as Rest API
 
-<span style="color:red"> Update v1 (Feb 2017): <br>
-At the time of writing Azure Flask does not support 64 bit Python out-of-the-box, however CNTK is 64 bit only. We are currently looking into this and hope to have an update here within the next weeks. In the meantime, one could probably follow a similar approach as was done [here](https://github.com/ilkarman/Blog/blob/master/rndm/AzureWebApp.md), or alternatively use the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
-</span>
+```diff
++ Update v1 (Feb 2017):
++ At the time of writing Azure Flask does not support 64 bit Python out-of-the-box, however CNTK is 64 bit only. We are currently looking into this and hope to have an update here within the next weeks. In the meantime, one could probably follow a similar approach as was done [here](https://github.com/ilkarman/Blog/blob/master/rndm/AzureWebApp.md), or alternatively use the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
+```
 
 Finally, the trained model can be used to create a web service or Rest API on Azure. For this we recommend using a technology called Flask, which makes it easy to run Python code in the cloud. See the tutorial [Creating web apps with Flask in Azure](https://azure.microsoft.com/en-us/documentation/articles/web-sites-python-create-deploy-flask-app/) for step-by-step instructions.
 
@@ -426,12 +427,12 @@ FUTURE WORK
 ---------------
 
 One big item for future work is to use CNTK's Python APIs. Once these are fully available, the following changes can be made which should significantly improve run-time performance and simplify the code:
-- Reduce start-up time by loading the model only once and then keeping it persistent in memory. <span style="color:green"> Done in v1</span>
-- Reduce processing time using in-memory calls of the python wrappers, rather than writing all inputs and outputs to file first and subsequently parsing the CNTK output back into memory (e.g. this is especially expensive for the temporary file *train.z* in step 3 which can be many Gigabytes in size). <span style="color:green"> Done in v1 </span>
+- Reduce start-up time by loading the model only once and then keeping it persistent in memory. <-- Done in v1.
+- Reduce processing time using in-memory calls of the python wrappers, rather than writing all inputs and outputs to file first and subsequently parsing the CNTK output back into memory (e.g. this is especially expensive for the temporary file *train.z* in step 3 which can be many Gigabytes in size). <-- Done in v1.
 - Reduce code complexity by evaluating the network for each ROI on-the-fly in the `im_detect()` function rather than pre-computing all outputs in steps 4 and 5.
 
 Other items for future work include:
-- Replace Selective Search with a faster and more accurate implementation. <span style="color:green"> Done in v1 </span>
+- Replace Selective Search with a faster and more accurate implementation. <-- Done in v1.
 - Adding bounding box regression.
 - Implementation of fast*er* R-CNN, i.e. performing ROI generation inside the DNN.
 - Using a more recent DNN topology such as ResNet instead of AlexNet.
