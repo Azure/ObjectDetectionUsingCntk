@@ -2,6 +2,11 @@
 Fast R-CNN Object Detection Tutorial for Microsoft Cognitive Toolkit (CNTK)
 ==============
 
+<span style="color:red"> Update v1 (Feb 2017): <br>
+This tutorial was updated to use CNTK's python wrappers. Now all processing happens in-memory during scoring. See script 6_runSingleImage for an example. Furthermore, we switched to a much more accurate and faster implementation of Selective Search. <br>
+Note that, at the time of writing, CNTK does not support Python 2. If you need Python 2 then please refer to the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
+</span>
+
 DESCRIPTION
 --------------
 
@@ -16,7 +21,7 @@ The goal of this tutorial is to show how to train and test your own Deep Learnin
 
 The tutorial is split into four parts:
 -	[Part 1](#part-1) shows how to train an object detection model for the example data without retraining the provided Neural Network, but instead training an external classifier on its output. This approach works particularly well with small datasets, and does not require expertise with deep learning.
--	[Part 2](#part-2) extends this approach to refine the Neural Network directly. The advantages / disadvantages of this approach will be discussed in
+-	[Part 2](#part-2) extends this approach to refine the Neural Network directly without the need for an external classifier.
 -	[Part 3](#part-3) illustrates how to annotate your own images and use these to train an object detection model for your specific use case.
 -	[Part 4](#part-4) covers how to reproduce published results on the Pascal VOC dataset.
 
@@ -28,28 +33,42 @@ Previous expertise with Machine Learning while not required to complete this tut
 PREREQUISITS
 --------------
 
-This tutorial requires CNTK version >= 2.0 and Python version 2 to be installed. Both 32-bit and 64-bit versions of Python are supported, however 32-bit Python runs out of memory during SVM training even if the dataset is small (such as the provided example dataset for grocery detection). The python interpreter can be downloaded from the [official download page](https://www.python.org/downloads/windows/), and CNTK installation instructions are given on the [download page](https://github.com/Microsoft/CNTK/wiki/CNTK-Binary-Download-and-Configuration). CNTK will also install a Python Anaconda environment which we will not use (since this tutorial was written for Python 2). In the following we assume that the python interpreter is installed in *C:/Python/* and the CNTK binaries are in *C:/local/cntk/cntk/*. A dedicated GPU is not required, but recommended for retraining of the Neural Network (part 2).
+This tutorial requires CNTK release >= 2.0.beta11 with either Python 3.5-64bit (recommended) or Python 3.4-64bit.
 
-Several Python packages are required to execute the python scripts: Pillow, xmltodict, wheel, numpy, opencv, scikit-learn, scipy, matplotlib, scikit-image, easydict and selectivesearch. These libraries can be installed easily using the provided python wheels  in *resources/python2_{32,64}bit_requirements/*. The libraries can be installed by opening a command prompt and running:
+A dedicated GPU is not required, but recommended for retraining of the Neural Network (part 2). If you lack a strong GPU, don't want to install CNTK yourself, or want to train a model using multiple GPUs, then consider using Azure's Data Science Virtual Machine. See the [Cortana Intelligence Gallery](https://gallery.cortanaintelligence.com/Solution/Linux-Data-Science-Virtual-Machine-3) for a 1-click deployment solution.
+
+CNTK can be easily installed by following the instructions on the [setup page](https://github.com/Microsoft/CNTK/wiki/Setup-Windows-Binary-Script). This will also automatically add an Anaconda Python distribution. At the time of writing, the default python version is 3.5.
+
+<!--
+The only change needed to instead install Python 3.4 is by adding the string '-PyVersion 34' when starting the installation:
 ````bash
-cd resources/python2_64bit_requirements/
-C:/Python/Scripts/pip.exe install -r requirements.txt
+*./install.ps1 -execute -PyVersion 34
 ````
-This assumes the python interpreter is installed to the directory *C:/Python/*. The resource files and the original zip file can be deleted once installation completed. The python wheels were originally downloaded from this [page](http://www.lfd.uci.edu/~gohlke/pythonlibs/).
+-->
 
-Typically *pip.exe* comes installed with Python. If that is not the case on your system, or if the *C:/Python/Scripts/* directory does not exist, then this command should install it:
+In the following, we assume that the python interpreter is in *C:/local/Anaconda3-4.1.1-Windows-x86_64/* and the CNTK root directory is  *C:/local/CNTK-2-0-beta8-0-Windows-64bit-GPU/*.
+
+Several Python packages are required to execute the python scripts: Pillow, xmltodict, wheel, numpy, opencv, scikit-learn, scipy, matplotlib, scikit-image and easydict. These libraries can be installed easily using provided python wheels by opening a command prompt and running:
 ````bash
-C:/Python/python -m ensurepip
+C:/local/CNTK-2-0-beta11-0-Windows-64bit-GPU/cntk/Scripts/cntkpy35.bat
+cd resources/python35_64bit_requirements/
+pip.exe install -r requirements.txt
 ````
+The python wheels were originally downloaded from this [page](http://www.lfd.uci.edu/~gohlke/pythonlibs/).
 
-If the CNTK binaries are not located at "C:/local/cntk/cntk/", the variable `cntkBinariesDir` in `PARAMETERS.py` needs to be updated to point to the correct directory:
+Finally, the file *AlexNet.model* is too big to be hosted in Github and hence needs to be downloaded manually from [here](https://www.cntk.ai/Models/AlexNet/AlexNet.model) and placed into the subfolder */resources/cntk/AlexNet.model*.
+
+Troubleshooting:
+- If the CNTK binaries are not located at "C:/local/CNTK-2-0-beta11-0-Windows-64bit-GPU/cntk/cntk/", then the variable `cntkBinariesDir` in `PARAMETERS.py` needs to be updated to point to the correct directory:
 ```python
-cntkBinariesDir = "myCntkBinariesDirectory>"
+cntkBinariesDir = "<myCntkBinariesDirectory>"
 ```
+- Typically *pip.exe* comes installed with Python. If that is not the case on your system, then this command should install it:
+````bash
+python -m ensurepip
+````
 
-And finally, the file *AlexNet.model* is too big to be hosted in Github and hence needs to be downloaded manually from [here](https://www.cntk.ai/Models/AlexNet/AlexNet.model) and placed into the subfolder */resources/cntk/AlexNet.model*.
 
-If you lack a strong GPU, don't want to install CNTK yourself, or want to train a model using multiple GPUs, then consider using Azure's Data Science Virtual Machine. The GPU-VMs are currently in preview model but will be fully available soon. See the [Cortana Intelligence Gallery](https://gallery.cortanaintelligence.com/Solution/Linux-Data-Science-Virtual-Machine-3) for a 1-click deployment solution.
 
 
 
@@ -67,11 +86,12 @@ FOLDER STRUCTURE
 |/fastRCNN/|			Slightly modified code used in R-CNN publications
 |/resources/|		  All provided resources are in here
 |/resources/cntk/|   CNTK configuration file and pre-trained AlexNet model
-|/resources/python2_32_bit_requirements/|   Python wheels and requirements file for 32bit Python
-|/resources/python2_64_bit_requirements/|   Python wheels and requirements file for 64bit Python
+|/resources/python34_64_bit_requirements/|   Python wheels and requirements file for 64bit Python version 3.4
+|/resources/python35_64_bit_requirements/|   Python wheels and requirements file for 64bit Python version 3.5
+
 
 All scripts used in this tutorial are located in the root folder.
-<!-- The provided grocery example images are in the public domain and were downloaded from [www.publicdomainpictures.net](http://www.publicdomainpictures.net/). -->
+
 
 PART 1
 --------------
@@ -91,11 +111,13 @@ Every step has to be executed in order, and we recommend after each step to insp
 ### STEP 1: Computing Region of Interests
 `Script: 1_computeRois.py`
 
-Region-of-interests (ROIs) are computed for each image independently using a 3-step approach: First, Selective Search is used to generate hundreds of ROIs per Image. These ROIs often fit tightly around some objects but miss other objects in the image (see [Selective Search](#selective-search) section). Many of the ROIs are bigger, smaller, etc. than the typical grocery item in our dataset. Hence in a second step these ROIs are discarded. Finally, to complement the detected ROIs from Selective Search, ROIs that uniform cover the image are added at different scales and aspect ratios.
+Region-of-interests (ROIs) are computed for each image independently using a 3-step approach: First, Selective Search is used to generate hundreds of ROIs per Image. These ROIs often fit tightly around some objects but miss other objects in the image (see [Selective Search](#selective-search) section). Many of the ROIs are bigger, smaller, etc. than the typical grocery item in our dataset. Hence in a second step these ROIs, as well as ROIs which are too similar, are discarded. Finally, to complement the detected ROIs from Selective Search, ROIs that uniform cover the image are added at different scales and aspect ratios.
 
 The final ROIs are written for each image separately to the files *[imageName].roi.txt* in the *proc/grocery/rois/* folder.
 
-For the grocery dataset, the approach outlined above generates between 1500 and 2000 ROIs per image. The goodness of these ROIs can be measured by counting how many of the ground truth annotated objects in the image are covered by at least one ROI, where "covered" is defined as having an overlap greater than a given threshold. Script `B1_evaluateRois.py` outputs these counts at different threshold values.
+For the grocery dataset, selective search typically generates around 1000 ROIs per image, plus on average another 2000 ROIs sampled uniformly from the image. A high number of ROIs typically leads to better object detection performance, at the expense however of longer running time. Hence the parameter `cntk_nrRois` can be used to only keep a subset of the ROIs (e.g. if `cntk_nrRois = 2000` then typically all ROIs from selective search are preserved, plus the 1000 largest ROIs generated using uniform sampling).
+
+The goodness of these ROIs can be measured by counting how many of the ground truth annotated objects in the image are covered by at least one ROI, where "covered" is defined as having an overlap greater than a given threshold. Script `B1_evaluateRois.py` outputs these counts at different threshold values. For example for a threshold of 0.5 and 2000 ROIs, the recall is around 98%, while with 200 ROIs the recall is around 82%. It is important that the recall at a threshold of 0.5 is close to 100%, since even a perfect classifier cannot find an object in the image if it is not covered by at least one ROI.
 
 ROIs computed using Selective Search (left); ROIs from the image above after discarding ROIs that are too small, too big, etc. (middle); Final set of ROIs after adding ROIs that uniformly cover the image (right).
 <p align="center">
@@ -125,9 +147,10 @@ This step writes the above mentioned files to the directory *proc/grocery/cntkFi
 ### STEP 3: Running CNTK
 `Script: 3_runCntk.py`
 
-We can now run the CNTK executable which takes as input the co-ordinates and labels files from the last step and outputs the 4096 float embedding for each ROI and for each image. This will take some minutes to process, and will automatically run on GPU if detected.
+We can now run the CNTK training which takes as input the co-ordinates and labels files from the last step and writes the 4096 float embedding for each ROI and for each image to *proc/grocery/cntkFiles/{train,test}_svm_parsed/[imageName].dat.npz*. This will take a few minutes, and will automatically run on GPU if detected.
 
-This generates two potentially very big files: *test.z* and *train.z* in the *proc/grocery/cntkFiles/* directory. Given e.g. our 25 training images and 2000 ROIs per image, the train.z file will contain 25 \* 2000 \* 4096 = 204.8 million floating point values in ASCII format. After the CNTK executable finished running, these two files are then parsed and separate (compressed) files written for each image to *proc/grocery/cntkFiles/{train,test}_svm_parsed/[imageName].dat.npz*. While not technically necessary, this makes reading of the CNTK output easier in subsequent steps. Once parsed, the *test.z* and *train.z* files are not needed anymore and are automatically deleted.
+Note: Look for the line "Using GPU for training." in the console output to make sure the training runs on GPU and not CPU (which would be too slow). It happened to me many times that a previous CNTK run was still open and holding a block on the GPU.
+
 
 ### STEP 4: Classifier training
 `Script: 4_trainSvm.py`
@@ -156,46 +179,19 @@ Note that mAP's for both set are similar, which indicates that the classifier do
 
 <!-- Note that the mAP for the training set is much higher than for the test set. This is because the classifier was able to memorize the (tiny) training set but not to generalize well to new images (aka. over-fitting). Also, the accuracy on cars is much better than for people, which might be due to the fact that cars are typically much bigger in the image. The accuracy on the test is very bad, which is due to the detections being not very accuracy (see the results for the three images below) and due to test set containing only three images. -->
 
+Results using 200 ROIs (this number is too low to get good accuracy but for demo purposes allows for fast training and scoring):
+
 |Dataset|     AP(avocado)|AP(orange)|AP(butter)|AP(champagne)|   | mAP
 |---|---|---|---|---|---|---
-|Training set|0.49       |0.63      |0.69      |1.0          |...|**0.80**
-|Test Set|    1.00       |0.25      |0.56      |1.0          |   |**0.82**
+|Training set|0.91       |0.76      |0.46      |0.81          |...|**0.62**
+|Test Set|    0.64       |1.00      |0.64      |1.00          |   |**0.62**
 
-<!-- AP for         avocado = 1.0000
-AP for          orange = 0.2500
-AP for          butter = 0.5556
-AP for       champagne = 1.0000
-AP for          eggBox = 1.0000
-AP for          gerkin = 1.0000
-AP for         joghurt = 0.5556
-AP for         ketchup = 1.0000
-AP for     orangeJuice = 0.7500
-AP for           onion = 1.0000
-AP for          pepper = 1.0000
-AP for          tomato = 0.8000
-AP for           water = 1.0000
-AP for            milk = 1.0000
-AP for         tabasco = 0.2500
-AP for         mustard = 1.0000
-Mean AP = 0.8226 -->
+Results using 2000 ROIs:
 
-<!-- AP for         avocado = 0.4858
-AP for          orange = 0.6250
-AP for          butter = 0.6879
-AP for       champagne = 1.0000
-AP for          eggBox = 0.7821
-AP for          gerkin = 0.8595
-AP for         joghurt = 0.8512
-AP for         ketchup = 0.8302
-AP for     orangeJuice = 0.8676
-AP for           onion = 0.5550
-AP for          pepper = 1.0000
-AP for          tomato = 1.0000
-AP for           water = 1.0000
-AP for            milk = 1.0000
-AP for         tabasco = 0.5000
-AP for         mustard = 0.8000
-Mean AP = 0.8028 -->
+|Dataset|     AP(avocado)|AP(orange)|AP(butter)|AP(champagne)|   | mAP
+|---|---|---|---|---|---|---
+|Training set|1.00       |0.76      |1.00      |1.00          |...|**0.89**
+|Test Set|    1.00       |0.55      |0.64      |1.00          |   |**0.88**
 
 The output of the classifier can be visualized using the script `5_visualizeResults.py`. Only ROIs classified as grocery item are shown (not background), and only if the confidence in the detection is greater or above 0.5. Multiple ROIs are combined into single detections using   [Non-Maxima Suppression](#non-maxima-suppression), the output of which is visualized below for the test images:  
 <p align="center">
@@ -207,18 +203,36 @@ The output of the classifier can be visualized using the script `5_visualizeResu
 </p>
 
 
+### STEP 6: Scoring images
+`Script: 6_scoreImage`
+
+Up to now our focus was on training a model and evaluating its performance. Hence all steps were performed one-by-one, and intermediate results were written to and loaded from disk. During scoring, given one or more images, it would be preferable to perform all steps in-memory. Exactly this is done in script `6_scoreImage`: it loads a given image, computes the ROIs, runs each ROI through the DNN, evaluates the trained SVM if needed, and finally outputs a list of the detected objects.
+
+Note that the script makes call to functions in `cntk_helpers.py` which were originally written for steps 1-5. Loading the model takes a few seconds, but this only has to be done once and can then be kept in-memory (e.g. in a web-service which waits for images to be uploaded).
+
+
+
 PART 2
 --------------
 In part 1 we learned how to classify ROIs by training a linear Support Vector Machine on the output of a given Neural Network. We will now show how to instead perform this classification directly in the Deep Neural Network. This can be achieved by adding a new last layer which, given the input from the last fully connected layer, outputs the probabilities for each ROI to be of a certain class. See section [SVM vs NN training](#svm-vs-nn-training) for pros/cons of the two different approaches.
 
-Training the Neural Network instead of an SVM is done by simply changing the variable `classifier` in `PARAMETERS.py` from "svm" to "nn". Then, as described in part 1, all the scripts need to be executed in order, except for the SVM training in step 4. This will add a classification layer to the network and train the last layer(s) of the network, and for each ROI write its classification label and confidence to disk (rather than the 4096 floats representation which was required to train the SVM). Note that NN training can cause an out-of-memory error on less powerful machines which can possibly be avoided by reducing the number of ROIs per image from 2000 to e.g. 200 (see variable `cntk_nrRois` in `PARAMETERS.py`).
+Training the Neural Network instead of an SVM is done by simply changing the variable `classifier` in `PARAMETERS.py` from "svm" to "nn". Then, as described in part 1, all the scripts need to be executed in order, except for the SVM training in step 4. This will add a classification layer to the network and train the last layer(s) of the network, and for each ROI write its classification label and confidence to disk (rather than the 4096 floats representation which was required to train the SVM). Note that NN training can cause an out-of-memory error on less powerful machines which can possibly be avoided by reducing the minibatch size and if needed also the number of ROIs per image (see variables `cntk_mb_size` and `cntk_nrRois` in `PARAMETERS.py`).
 
 The mean Average Precision measure after running all steps should roughly look like the results below. Note that the accuracy on the training set is much higher compared to training a linear SVM (part 1, step 5). This is because the neural network is less regularized and hence able to memorize the training set better.
 
+Using 200 ROIs:
+
 |Dataset|     AP(avocado)|AP(orange)|AP(butter)|AP(champagne)|   | mAP
 |---|---|---|---|---|---|---
-|Training set|1.00       |0.83      |0.91      |1.00         |...|**0.96**
-|Test Set|    1.00       |1.00      |0.67      |0.75         |   |**0.87**
+|Training set|0.91       |1.00      |0.46      |0.91          |...|**0.76**
+|Test Set|    0.36       |1.00      |0.64      |1.00          |   |**0.68**
+
+Using 2000 ROIs:
+
+|Dataset|     AP(avocado)|AP(orange)|AP(butter)|AP(champagne)|   | mAP
+|---|---|---|---|---|---|---
+|Training set|1.00       |1.00      |1.00      |1.00         |...|**0.96**
+|Test Set|    1.00       |1.00      |0.67      |0.75         |   |**0.92**
 
 <!-- AP for         avocado = 1.0000
 AP for          orange = 1.0000
@@ -304,19 +318,28 @@ As is true for most Machine Learning project, getting good results requires care
 Here now a few tips on how to find good parameters / design a good training set:
 - Select images carefully and perform annotations identically across all images. Typically, all objects in the image need to be annotated, even if the image contains many of them. It is common practice to remove such cluttered images. This is similarly true also for images where one is uncertain about the label of an object or where it is unclear whether the object should even be annotated (e.g. due to truncation, occlusion, motion blur, etc.).
 - During Region-of-Interest generation in step 1, all ROIs which are deemed too small, too big, etc. are discarded. This filtering step relies on thresholds on the respective properties and are defined in `PARAMETERS.py` (paragraph "ROI generation").  
-Visualizing the generated ROIs helps tremendously for debugging and can be done either while computing the ROIs in the script `1_computeRois.py` itself, or by visualizing the CNTK training files using the script `B2_cntkVisualizeInputs.py`. In addition, script `B1_evaluateRois.py` computes the percentage of annotated ground truth objects that are covered by one or more ROI (i.e. recall).
+Visualizing the generated ROIs helps tremendously for debugging and can be done either while computing the ROIs in the script `1_computeRois.py` itself, or by visualizing the CNTK training files using the script `B2_cntkVisualizeInputs.py`. In addition, script `B1_evaluateRois.py` computes the percentage of annotated ground truth objects that are covered by one or more ROI (i.e. recall). Generally the more ROIs (variable `cntk_nrRois`) the better the accuracy, but at slower training and scoring speeds.
 - Training a linear SVM (step 4) is relatively robust and hence for most problems the corresponding parameters in `PARAMETERS.py` (paragraph "svm training") do not need to be modified.
 The evaluation script `5_evaluateResults.py` can be used to verify that the SVM successfully learned to capture the training data (typically the APs are above 0.5).
-- Training a Neural Network (part 2) is significantly more difficult, and often requires expert knowledge to make the network converge to a good solution (see [Michael Nielsen's](http://neuralnetworksanddeeplearning.com/) great introduction to Deep Neural Networks). The arguably most important parameter here is the learning rate.
+- Training a Neural Network (part 2) is significantly more difficult, and often requires expert knowledge to make the network converge to a good solution (see [Michael Nielsen's](http://neuralnetworksanddeeplearning.com/) great introduction to Deep Neural Networks). The arguably most important parameter here is the learning rate (parameter `cntk_lr_per_image`).
 - In addition to computing mAP, always also visualize the results on the test and on the training set. This is done with script `5_visualizeResults.py` and helps getting an understanding of the error modes, and to verify the model is behaving as expected.
 
 ### Publishing the model as Rest API
+
+<span style="color:red"> Update v1 (Feb 2017): <br>
+At the time of writing Azure Flask does not support 64 bit Python out-of-the-box, however CNTK is 64 bit only. We are currently looking into this and hope to have an update here within the next weeks. In the meantime, one could probably follow a similar approach as was done [here](https://github.com/ilkarman/Blog/blob/master/rndm/AzureWebApp.md), or alternatively use the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
+</span>
 
 Finally, the trained model can be used to create a web service or Rest API on Azure. For this we recommend using a technology called Flask, which makes it easy to run Python code in the cloud. See the tutorial [Creating web apps with Flask in Azure](https://azure.microsoft.com/en-us/documentation/articles/web-sites-python-create-deploy-flask-app/) for step-by-step instructions.
 
 
 PART 4
 --------------
+<!--
+<span style="color:red"> Part 4, i.e. accuracy evaluation on Pascal VOC, is not supported anymore in this version of the tutorial. This is mainly due to the long time required to train the DNN, however the code should still mostly work. Please instead use the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial, or refer to the "Run Pascal VOC" section in CNTK's Fast R-CNN [tutorial](https://github.com/Microsoft/CNTK/wiki/Object-Detection-using-Fast-R-CNN#run-pascal-voc).
+</span>
+-->
+
 The last part of this tutorial shows how to reproduce published results on the Pascal VOC dataset.
 
 First, the Pascal VOC data as well as the pre-computed Selective Search boxes need to be downloaded from these links: [VOCtest_06-Nov-2007.tar](http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar),
@@ -377,8 +400,8 @@ The original Caffe implementation used in the R-CNN papers can be found at githu
 ### SVM vs NN training
 In the last section, we describe how a linear SVM model is trained on the ROI 4096 float embedding. Alternatively, and this has pros/cons which are outlined below, one can do this classification directly in the neural network in a soft-max layer that takes the 4096 floats of the 2nd-to-last fully-connected layer as input.
 
-The advantage of adding a new soft-max layer is that the full network can be retrained using backpropagation, including all convolution layers, which can lead to (slightly to moderately) better prediction accuracies. Another (implementation-dependent) advantage is that only (number of classes +1) floats per ROI need to be written/parsed compared to the 4096 floats ROI embedding used to train a SVM.  
-On the other hand, training a Neural Network requires a good GPU, is nevertheless 1-2 magnitudes slower than training a SVM, and requires extensive parameter tweaking and expert knowledge.
+The advantage of adding a new soft-max layer is that the full network can be retrained using backpropagation, including all convolution layers, which can lead to (slightly to moderately) better prediction accuracies. Another (implementation-dependent) advantage is that only (number of classes +1) floats per ROI need to be written to disk compared to the 4096 floats ROI embedding used to train a SVM.  
+On the other hand, training a Neural Network requires a good GPU, is even then 1-2 magnitudes slower than training a SVM, and requires extensive parameter tweaking and expert knowledge.
 
 ### Selective Search
 [Selective Search](http://koen.me/research/pub/uijlings-ijcv2013-draft.pdf) is a method for finding a large set of possible object locations in an image, independent of the class of the actual object. It works by clustering image pixels into segments, and then performing hierarchical clustering to combine segments from the same object into object proposals. The first image in part 1 shows an example output of Selective Search, where each possible object location is visualized by a green rectangle. These rectangles are then used as Regions-of-Interests (ROIs) in the R-CNN pipeline.
@@ -402,12 +425,12 @@ FUTURE WORK
 ---------------
 
 One big item for future work is to use CNTK's Python APIs. Once these are fully available, the following changes can be made which should significantly improve run-time performance and simplify the code:
-- Reduce start-up time by loading in the model only once and then keeping it persistent in memory.
-- Reduce processing time using in-memory calls of the python wrappers, rather than writing all inputs and outputs to file first and subsequently parsing the CNTK output back into memory (e.g. this is especially expensive for the temporary file *train.z* in step 3 which can be many Gigabytes in size).
+- Reduce start-up time by loading the model only once and then keeping it persistent in memory. <span style="color:green"> Done in v1</span>
+- Reduce processing time using in-memory calls of the python wrappers, rather than writing all inputs and outputs to file first and subsequently parsing the CNTK output back into memory (e.g. this is especially expensive for the temporary file *train.z* in step 3 which can be many Gigabytes in size). <span style="color:green"> Done in v1 </span>
 - Reduce code complexity by evaluating the network for each ROI on-the-fly in the `im_detect()` function rather than pre-computing all outputs in steps 4 and 5.
 
 Other items for future work include:
-- Evaluating alternatives to the currently used selective search implementation.
+- Replace Selective Search with a faster and more accurate implementation. <span style="color:green"> Done in v1 </span>
 - Adding bounding box regression.
 - Implementation of fast*er* R-CNN, i.e. performing ROI generation inside the DNN.
 - Using a more recent DNN topology such as ResNet instead of AlexNet.
