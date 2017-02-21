@@ -2,10 +2,11 @@
 Fast R-CNN Object Detection Tutorial for Microsoft Cognitive Toolkit (CNTK)
 ==============
 
-<span style="color:red"> Update v1 (Feb 2017): <br>
-This tutorial was updated to use CNTK's python wrappers. Now all processing happens in-memory during scoring. See script 6_runSingleImage for an example. Furthermore, we switched to a much more accurate and faster implementation of Selective Search. <br>
+```diff
++ Update v1 (Feb 2017):
++ This tutorial was updated to use CNTK's python wrappers. Now all processing happens in-memory during scoring. See script 6_runSingleImage for an example. Furthermore, we switched to a much more accurate and faster implementation of Selective Search. <br>
 Note that, at the time of writing, CNTK does not support Python 2. If you need Python 2 then please refer to the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
-</span>
+```
 
 DESCRIPTION
 --------------
