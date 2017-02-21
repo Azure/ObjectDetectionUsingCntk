@@ -3,8 +3,6 @@ import numpy as np
 import os, sys, pdb
 
 
-#TODO: move all cntk imports (and hence also code) inside here and then remove from helpers.py
-
 ####################################
 # MAIN
 ####################################

@@ -2,10 +2,11 @@
 Fast R-CNN Object Detection Tutorial for Microsoft Cognitive Toolkit (CNTK)
 ==============
 
-<span style="color:red"> Update v1 (Feb 2017): <br>
-This tutorial was updated to use CNTK's python wrappers. Now all processing happens in-memory during scoring. See script 6_runSingleImage for an example. Furthermore, we switched to a much more accurate and faster implementation of Selective Search. <br>
-Note that, at the time of writing, CNTK does not support Python 2. If you need Python 2 then please refer to the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
-</span>
+```diff
++ Update v1 (Feb 2017):
++ This tutorial was updated to use CNTK's python wrappers. Now all processing happens in-memory during scoring. See script 6_runSingleImage for an example. Furthermore, we switched to a much more accurate and faster implementation of Selective Search.
++ Note that, at the time of writing, CNTK does not support Python 2. If you need Python 2 then please refer to the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
+```
 
 DESCRIPTION
 --------------
@@ -117,7 +118,7 @@ The final ROIs are written for each image separately to the files *[imageName].r
 
 For the grocery dataset, selective search typically generates around 1000 ROIs per image, plus on average another 2000 ROIs sampled uniformly from the image. A high number of ROIs typically leads to better object detection performance, at the expense however of longer running time. Hence the parameter `cntk_nrRois` can be used to only keep a subset of the ROIs (e.g. if `cntk_nrRois = 2000` then typically all ROIs from selective search are preserved, plus the 1000 largest ROIs generated using uniform sampling).
 
-The goodness of these ROIs can be measured by counting how many of the ground truth annotated objects in the image are covered by at least one ROI, where "covered" is defined as having an overlap greater than a given threshold. Script `B1_evaluateRois.py` outputs these counts at different threshold values. For example for a threshold of 0.5 and 2000 ROIs, the recall is around 98%, while with 200 ROIs the recall is around 82%.
+The goodness of these ROIs can be measured by counting how many of the ground truth annotated objects in the image are covered by at least one ROI, where "covered" is defined as having an overlap greater than a given threshold. Script `B1_evaluateRois.py` outputs these counts at different threshold values. For example for a threshold of 0.5 and 2000 ROIs, the recall is around 98%, while with 200 ROIs the recall is around 85%. It is important that the recall at a threshold of 0.5 is close to 100%, since even a perfect classifier cannot find an object in the image if it is not covered by at least one ROI.
 
 ROIs computed using Selective Search (left); ROIs from the image above after discarding ROIs that are too small, too big, etc. (middle); Final set of ROIs after adding ROIs that uniformly cover the image (right).
 <p align="center">
@@ -318,7 +319,7 @@ As is true for most Machine Learning project, getting good results requires care
 Here now a few tips on how to find good parameters / design a good training set:
 - Select images carefully and perform annotations identically across all images. Typically, all objects in the image need to be annotated, even if the image contains many of them. It is common practice to remove such cluttered images. This is similarly true also for images where one is uncertain about the label of an object or where it is unclear whether the object should even be annotated (e.g. due to truncation, occlusion, motion blur, etc.).
 - During Region-of-Interest generation in step 1, all ROIs which are deemed too small, too big, etc. are discarded. This filtering step relies on thresholds on the respective properties and are defined in `PARAMETERS.py` (paragraph "ROI generation").  
-Visualizing the generated ROIs helps tremendously for debugging and can be done either while computing the ROIs in the script `1_computeRois.py` itself, or by visualizing the CNTK training files using the script `B2_cntkVisualizeInputs.py`. In addition, script `B1_evaluateRois.py` computes the percentage of annotated ground truth objects that are covered by one or more ROI (i.e. recall).
+Visualizing the generated ROIs helps tremendously for debugging and can be done either while computing the ROIs in the script `1_computeRois.py` itself, or by visualizing the CNTK training files using the script `B2_cntkVisualizeInputs.py`. In addition, script `B1_evaluateRois.py` computes the percentage of annotated ground truth objects that are covered by one or more ROI (i.e. recall). Generally the more ROIs (variable `cntk_nrRois`) the better the accuracy, but at slower training and scoring speeds.
 - Training a linear SVM (step 4) is relatively robust and hence for most problems the corresponding parameters in `PARAMETERS.py` (paragraph "svm training") do not need to be modified.
 The evaluation script `5_evaluateResults.py` can be used to verify that the SVM successfully learned to capture the training data (typically the APs are above 0.5).
 - Training a Neural Network (part 2) is significantly more difficult, and often requires expert knowledge to make the network converge to a good solution (see [Michael Nielsen's](http://neuralnetworksanddeeplearning.com/) great introduction to Deep Neural Networks). The arguably most important parameter here is the learning rate (parameter `cntk_lr_per_image`).
@@ -327,6 +328,11 @@ The evaluation script `5_evaluateResults.py` can be used to verify that the SVM 
 ### Publishing the model as Rest API
 
 Finally, the trained model can be used to create a web service or Rest API on Azure. For this we recommend using a technology called Flask, which makes it easy to run Python code in the cloud. See the tutorial [Creating web apps with Flask in Azure](https://azure.microsoft.com/en-us/documentation/articles/web-sites-python-create-deploy-flask-app/) for step-by-step instructions.
+
+**Update v1 (Feb 2017):**
+At the time of writing Azure Flask does not support 64 bit Python out-of-the-box, however CNTK is 64 bit only. We are currently looking into this and hope to have an update here within the next weeks. In the meantime, one could probably follow a similar approach as was done [here](https://github.com/ilkarman/Blog/blob/master/rndm/AzureWebApp.md), or alternatively use the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
+
+
 
 
 PART 4
@@ -421,12 +427,12 @@ FUTURE WORK
 ---------------
 
 One big item for future work is to use CNTK's Python APIs. Once these are fully available, the following changes can be made which should significantly improve run-time performance and simplify the code:
-- Reduce start-up time by loading the model only once and then keeping it persistent in memory. <span style="color:green"> Done in v1</span>
-- Reduce processing time using in-memory calls of the python wrappers, rather than writing all inputs and outputs to file first and subsequently parsing the CNTK output back into memory (e.g. this is especially expensive for the temporary file *train.z* in step 3 which can be many Gigabytes in size). <span style="color:green"> Done in v1 </span>
+- Reduce start-up time by loading the model only once and then keeping it persistent in memory. <-- Done in v1.
+- Reduce processing time using in-memory calls of the python wrappers, rather than writing all inputs and outputs to file first and subsequently parsing the CNTK output back into memory (e.g. this is especially expensive for the temporary file *train.z* in step 3 which can be many Gigabytes in size). <-- Done in v1.
 - Reduce code complexity by evaluating the network for each ROI on-the-fly in the `im_detect()` function rather than pre-computing all outputs in steps 4 and 5.
 
 Other items for future work include:
-- Replace Selective Search with a faster and more accurate implementation. <span style="color:green"> Done in v1 </span>
+- Replace Selective Search with a faster and more accurate implementation. <-- Done in v1.
 - Adding bounding box regression.
 - Implementation of fast*er* R-CNN, i.e. performing ROI generation inside the DNN.
 - Using a more recent DNN topology such as ResNet instead of AlexNet.

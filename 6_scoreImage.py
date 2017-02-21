@@ -8,9 +8,11 @@ locals().update(importlib.import_module("PARAMETERS").__dict__)
 ####################################
 # Parameters
 ####################################
-imgPath = r"C:\Users\pabuehle\Desktop\newImgs\WIN_20160803_11_48_26_Pro.jpg"
+imgPath = r"C:/Users/pabuehle/Desktop/newImgs/WIN_20160803_11_48_26_Pro.jpg"
+
+#choose which classifier to use
+classifier = 'svm'
 svm_experimentName = 'exp1'
-classifier = 'nn'
 
 # no need to change these parameters
 boAddSelectiveSearchROIs = True
