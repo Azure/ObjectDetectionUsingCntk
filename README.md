@@ -34,7 +34,7 @@ Previous expertise with Machine Learning while not required to complete this tut
 PREREQUISITS
 --------------
 
-This tutorial requires CNTK release >= 2.0.beta11 with either Python 3.5-64bit (recommended) or Python 3.4-64bit.
+This tutorial requires CNTK release 2.0.beta11 with either Python 3.5-64bit (recommended) or Python 3.4-64bit. Note that 2.0.beta12 and higher introduced breaking changes, and hence version beta11 is currently a requirement.
 
 A dedicated GPU is not required, but recommended for retraining of the Neural Network (part 2). If you lack a strong GPU, don't want to install CNTK yourself, or want to train a model using multiple GPUs, then consider using Azure's Data Science Virtual Machine. See the [Cortana Intelligence Gallery](https://gallery.cortanaintelligence.com/Solution/Linux-Data-Science-Virtual-Machine-3) for a 1-click deployment solution.
 
