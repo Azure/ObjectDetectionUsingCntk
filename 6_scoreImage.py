@@ -85,8 +85,8 @@ if boUseNonMaximaSurpression:
 print("Time non-maxima surpression [ms]: " + str((datetime.datetime.now() - tstart).total_seconds() * 1000))
 
 # visualize results
-imgDebug = visualizeResults(imgPath, labels, scores, currRois, cntk_padWidth, cntk_padHeight,
-                            classes, nmsKeepIndices, boDrawNegativeRois=False, boDrawNmsRejectedRois=False)
+imgDebug = visualizeResults(imgPath, labels, scores, currRois, classes, nmsKeepIndices,
+                            boDrawNegativeRois=False, boDrawNmsRejectedRois=False)
 imshow(imgDebug, waitDuration=0, maxDim=800)
 #imwrite(imgDebug, visualizationDir + "/" + classifier + "_" + str(imgIndex) + os.path.basename(imgPath))
 
@@ -97,10 +97,19 @@ for i in nmsKeepIndices:
 outJsonString = json.dumps(outDict)
 print("Json-encoded detections: " + outJsonString[:120] + "...")
 
-# write all detections to file
+print("DONE.")
+
+
+
+#--- optional code ---#
+
+# write all detections to file, and show how to read in again to visualize
 # outTable = [["label", "score", "nms", "left", "top", "right", "bottom"]]
 # outTable += [[classes[int(x["label"])], x["score"], x["nms"], x["left"], x["top"], x["right"], x["bottom"]] for x in outDict]
 # writeTable("detections.tsv", outTable)
+# labels2, scores2, currRois2, nmsKeepIndices2 = parseDetectionsFile("detections.tsv", lutClass2Id)
+# imgDebug2 = visualizeResults(imgPath, labels2, scores2, currRois2, classes, nmsKeepIndices2,  # identical to imgDebug
+#                              boDrawNegativeRois=False, boDrawNmsRejectedRois=False)
 
 # extract crop of the highest scored ROI
 # maxScore = -float("inf")
@@ -116,4 +125,3 @@ print("Json-encoded detections: " + outJsonString[:120] + "...")
 #    imwrite(imgCrop, outCropDir + os.path.basename(imgPath))
 #    imshow(imgCrop)
 
-print("DONE.")

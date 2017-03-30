@@ -641,7 +641,7 @@ def updateRoisGtClassIfHighGtOverlap(imdb, positivesGtOverlapThreshold):
 ####################################
 # Visualize results
 ####################################
-def visualizeResults(imgPath, roiLabels, roiScores, roiRelCoords, padWidth, padHeight, classes,
+def visualizeResults(imgPath, roiLabels, roiScores, roiRelCoords, classes,
                      nmsKeepIndices = None, boDrawNegativeRois = True, boDrawNmsRejectedRois = True,
                      decisionThreshold = 0.0):
     # read and resize image
@@ -748,6 +748,15 @@ def apply_nms(all_boxes, thresh, boUsePythonImpl = True):
             nms_boxes[cls_ind][im_ind] = dets[keep, :].copy()
             nms_keepIndices[cls_ind][im_ind] = keep
     return nms_boxes, nms_keepIndices
+
+
+def parseDetectionsFile(detPath, lutClass2Id):
+    detTable = readTable(detPath)[1:]
+    labels = [lutClass2Id[s] for s in getColumn(detTable,0)]
+    scores = ToFloats(getColumn(detTable,1))
+    currRois = np.array(getColumns(detTable,[3,4,5,6]), np.int)
+    nmsKeepIndices = list(np.where(np.array(getColumn(detTable,2)) == 'True')[0])
+    return labels, scores, currRois, nmsKeepIndices
 
 
 
@@ -858,6 +867,13 @@ def getColumn(table, columnIndex):
     for row in table:
         column.append(row[columnIndex])
     return column
+
+def getColumns(table, columnIndices):
+    newTable = [];
+    for row in table:
+        rowWithColumnsRemoved = [row[index] for index in columnIndices]
+        newTable.append(rowWithColumnsRemoved)
+    return newTable
 
 def deleteFile(filePath):
     if os.path.exists(filePath):

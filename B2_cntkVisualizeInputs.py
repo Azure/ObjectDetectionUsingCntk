@@ -45,7 +45,6 @@ for imgIndex,imgPath in enumerate(imgPaths):
         print("Non-maxima surpression kept {} of {} rois (nmsThreshold={})".format(len(nmsKeepIndices), len(roiLabels), nmsThreshold))
 
     #visualize results
-    imgDebug = visualizeResults(imgPath, roiLabels, None, roiCoords, cntk_padWidth, cntk_padHeight,
-                                classes, nmsKeepIndices, boDrawNegativeRois=False)
+    imgDebug = visualizeResults(imgPath, roiLabels, None, roiCoords, classes, nmsKeepIndices, boDrawNegativeRois=False)
     imshow(imgDebug, waitDuration=0, maxDim = 800)
 print("DONE.")

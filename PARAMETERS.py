@@ -141,6 +141,7 @@ else:
 ############################
 nrClasses = len(classes)
 cntk_featureDimensions['nn'] = nrClasses
+lutClass2Id = dict(zip(classes, range(len(classes))))
 
 print("PARAMETERS: datasetName = " + datasetName)
 assert cntk_padWidth == cntk_padHeight, "ERROR: different width and height for padding not supported."
