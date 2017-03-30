@@ -22,8 +22,10 @@ boUseNonMaximaSurpression = True
 
 
 ####################################
-# Mainpip
+# Main
 ####################################
+random.seed(0)
+
 # load cntk model
 print("Loading DNN..")
 tstart = datetime.datetime.now()
@@ -89,8 +91,29 @@ imshow(imgDebug, waitDuration=0, maxDim=800)
 #imwrite(imgDebug, visualizationDir + "/" + classifier + "_" + str(imgIndex) + os.path.basename(imgPath))
 
 # create json-encoded string of all detections
-outDict = [{"label": str(l), "score": str(s), "left": str(r[0]), "top": str(r[1]), "right": str(r[2]), "bottom": str(r[3])} for l,s, r in zip(labels, scores, currRois)]
+outDict = [{"label": str(l), "score": str(s), "nms": str(False), "left": str(r[0]), "top": str(r[1]), "right": str(r[2]), "bottom": str(r[3])} for l,s, r in zip(labels, scores, currRois)]
+for i in nmsKeepIndices:
+    outDict[i]["nms"] = str(True)
 outJsonString = json.dumps(outDict)
 print("Json-encoded detections: " + outJsonString[:120] + "...")
+
+# write all detections to file
+# outTable = [["label", "score", "nms", "left", "top", "right", "bottom"]]
+# outTable += [[classes[int(x["label"])], x["score"], x["nms"], x["left"], x["top"], x["right"], x["bottom"]] for x in outDict]
+# writeTable("detections.tsv", outTable)
+
+# extract crop of the highest scored ROI
+# maxScore = -float("inf")
+# maxScoreRoi = []
+# for index, (label,score) in enumerate(zip(labels,scores)):
+#    if score > maxScore and label > 0: #and index in nmsKeepIndices:
+#        maxScore = score
+#        maxScoreRoi = currRois[index]
+# if maxScoreRoi == []:
+#    print("WARNING: not a single object detected")
+# else:
+#    imgCrop = imgOrig[maxScoreRoi[1]:maxScoreRoi[3], maxScoreRoi[0]:maxScoreRoi[2], :]
+#    imwrite(imgCrop, outCropDir + os.path.basename(imgPath))
+#    imshow(imgCrop)
 
 print("DONE.")
