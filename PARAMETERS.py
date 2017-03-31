@@ -79,6 +79,10 @@ nmsThreshold = 0.3                      # Non-Maxima suppression threshold (in r
 vis_decisionThresholds = {'svm' : 0.5,  # Reject detections with low confidence, used only in 5_visualizeResults
                           'nn' : None}
 
+# evaluation
+evalVocOverlapThreshold = 0.5 # voc-style intersection-over-union threshold used to determine if object was found
+
+
 
 ############################
 # project-specific

@@ -104,12 +104,11 @@ print("DONE.")
 #--- optional code ---#
 
 # write all detections to file, and show how to read in again to visualize
-# outTable = [["label", "score", "nms", "left", "top", "right", "bottom"]]
-# outTable += [[classes[int(x["label"])], x["score"], x["nms"], x["left"], x["top"], x["right"], x["bottom"]] for x in outDict]
-# writeTable("detections.tsv", outTable)
+# writeDetectionsFile("detections.tsv", outDict, classes)
 # labels2, scores2, currRois2, nmsKeepIndices2 = parseDetectionsFile("detections.tsv", lutClass2Id)
 # imgDebug2 = visualizeResults(imgPath, labels2, scores2, currRois2, classes, nmsKeepIndices2,  # identical to imgDebug
 #                              boDrawNegativeRois=False, boDrawNmsRejectedRois=False)
+# imshow(imgDebug2, waitDuration=0, maxDim=800)
 
 # extract crop of the highest scored ROI
 # maxScore = -float("inf")

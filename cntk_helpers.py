@@ -4,7 +4,7 @@ from builtins import str
 from builtins import range
 from builtins import object
 from past.utils import old_div
-import pdb, sys, os, time, random, dlib
+import pdb, sys, os, time, random, collections, dlib
 from os.path import join
 import numpy as np
 from easydict import EasyDict
@@ -750,6 +750,12 @@ def apply_nms(all_boxes, thresh, boUsePythonImpl = True):
     return nms_boxes, nms_keepIndices
 
 
+def writeDetectionsFile(outPath, outDict, classes):
+    outTable = [["label", "score", "nms", "left", "top", "right", "bottom"]]
+    outTable += [[classes[int(x["label"])], x["score"], x["nms"], x["left"], x["top"], x["right"], x["bottom"]] for x in outDict]
+    writeTable(outPath, outTable)
+
+
 def parseDetectionsFile(detPath, lutClass2Id):
     detTable = readTable(detPath)[1:]
     labels = [lutClass2Id[s] for s in getColumn(detTable,0)]
@@ -1201,6 +1207,31 @@ def bboxComputeOverlapVoc(bbox1, bbox2):
         assert (overlap >= 0 and overlap <= 1)
         return overlap
 
+# note: brute-fore-implementation. When boPenalizeMultipleDetections=True computed p/r will depend on box order.
+def detPrecisionRecall(detBboxes, detLabels, gtBboxes, gtLabels, overlapThreshold = 0.5, boPenalizeMultipleDetections = False):
+    if len(detBboxes) > 0:
+        goodGts  = [False] * len(gtBboxes)
+        goodDets = [False] * len(detBboxes)
+
+        # loop over all ground truth objects and all detections
+        for gtIndex, (gtBbox, gtLabel) in enumerate(zip(gtBboxes, gtLabels)):
+            for detIndex, (detBbox, detLabel) in enumerate(zip(detBboxes, detLabels)):
+                # optionally penalize if two or more detections are on a single ground truth object
+                if boPenalizeMultipleDetections and (goodGts[gtIndex] or goodDets[detIndex]):
+                    continue
+
+                # mark as good if detection has same label as the ground truth,
+                # and if the intersection-over-union overlap is above a threshold
+                if gtLabel == detLabel and bboxComputeOverlapVoc(gtBbox, detBbox) >= overlapThreshold:
+                    goodGts[gtIndex]   = True
+                    goodDets[detIndex] = True
+        recall    = float(sum(goodGts))  / len(goodGts)
+        precision = float(sum(goodDets)) / len(goodDets)
+    else:
+        recall    = 0  # if no detections then recall is 0 and precision is undefined
+        precision = None
+    return precision, recall
+
 def computeAveragePrecision(recalls, precisions, use_07_metric=False):
     """ ap = voc_ap(recalls, precisions, [use_07_metric])
     Compute VOC AP given precision and recall.
@@ -1233,3 +1264,6 @@ def computeAveragePrecision(recalls, precisions, use_07_metric=False):
         # and sum (\Delta recall) * prec
         ap = np.sum((mrecalls[i + 1] - mrecalls[i]) * mprecisions[i + 1])
     return ap
+
+
+
