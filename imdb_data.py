@@ -193,9 +193,10 @@ class imdb_data(fastRCNN.imdb):
         for classIndex, className in enumerate(self._classes):
             if className != '__background__':
                 rec, prec, ap = self._evaluate_detections(classIndex, all_boxes, use_07_metric, overlapThreshold)
-                aps += [ap]
+                aps += [[className,ap]]
                 print('AP for {:>15} = {:.4f}'.format(className, ap))
-        print('Mean AP = {:.4f}'.format(np.nanmean(aps)))
+        print('Mean AP = {:.4f}'.format(np.nanmean(getColumn(aps,1))))
+        return aps
 
     def _evaluate_detections(self, classIndex, all_boxes, use_07_metric = False, overlapThreshold = 0.5):
         """

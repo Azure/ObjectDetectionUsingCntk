@@ -39,6 +39,7 @@ else:
     deleteAllFilesInDirectory(evalTempDir, None)
 
 #compute mAPs
-test_net(net, imdb, evalTempDir, svmFeatScale, classifier, nmsThreshold, boUsePythonImpl = True, overlapThreshold = evalVocOverlapThreshold) #, boApplyNms = False) #, boThresholdDetections = False)
+evalResults = test_net(net, imdb, evalTempDir, svmFeatScale, classifier, nmsThreshold, boUsePythonImpl = True, overlapThreshold = evalVocOverlapThreshold) #, boApplyNms = False) #, boThresholdDetections = False)
+#writeTable("evalResults.tsv", [["CLASS","Average Precision (AP)"]] + evalResults)
 
 print("DONE.")

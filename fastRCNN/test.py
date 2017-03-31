@@ -379,4 +379,4 @@ def test_net(net, imdb, output_dir, feature_scale, classifier = 'svm', nmsThresh
         nms_dets = all_boxes
 
     print ('Evaluating detections')
-    imdb.evaluate_detections(nms_dets, output_dir, overlapThreshold)
+    return imdb.evaluate_detections(nms_dets, output_dir, overlapThreshold)
