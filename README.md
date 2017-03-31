@@ -194,7 +194,8 @@ Results using 2000 ROIs:
 |Training set|1.00       |0.76      |1.00      |1.00          |...|**0.89**
 |Test Set|    1.00       |0.55      |0.64      |1.00          |   |**0.88**
 
-The output of the classifier can be visualized using the script `5_visualizeResults.py`. Only ROIs classified as grocery item are shown (not background), and only if the confidence in the detection is greater or above 0.5. Multiple ROIs are combined into single detections using   [Non-Maxima Suppression](#non-maxima-suppression), the output of which is visualized below for the test images:  
+The output of the classifier can be visualized using the script `5_visualizeResults.py`. Only ROIs classified as grocery item are shown (not background), and only if the confidence in the detection is greater or above 0.5. Multiple ROIs are combined into single detections using   [Non-Maxima Suppression](#non-maxima-suppression), the output of which is visualized below for the test images.
+
 <p align="center">
 <img src="doc/svm_0WIN_20160803_11_28_42_Pro.jpg" alt="alt text" height="300"/>
 <img src="doc/svm_1WIN_20160803_11_42_36_Pro.jpg" alt="alt text" height="300"/>
@@ -202,6 +203,13 @@ The output of the classifier can be visualized using the script `5_visualizeResu
 <img src="doc/svm_3WIN_20160803_11_48_26_Pro.jpg" alt="alt text" height="300"/>
 <img src="doc/svm_4WIN_20160803_12_37_07_Pro.jpg" alt="alt text" height="300"/>
 </p>
+
+In addition to visualizing the detected objects, script `5_visualizeResults.py` also computes precision and recall after rejecting detections with confidence scores less than a given threshold. This information can be used to set an operating point of the final classifier: for example, given the table below, to reach 85% precision all detections with score less than 5.0 would have to be rejected.
+
+<p align="center">
+<img src="doc/precision_recall.jpg" alt="alt text" height="300"/>
+</p>
+
 
 
 ### STEP 6: Scoring images
