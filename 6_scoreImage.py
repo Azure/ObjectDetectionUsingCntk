@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-import sys, os, importlib, random
+import sys, os, importlib, random, json
 import PARAMETERS
-import json
-
+from helpers_cntk import *
 locals().update(importlib.import_module("PARAMETERS").__dict__)
 
 ####################################
@@ -58,7 +57,7 @@ imgPadded = imresizeAndPad(imgOrig, cntk_padWidth, cntk_padHeight)
 _, _, roisCntk = getCntkInputs(imgPath, currRois, None, train_posOverlapThres, nrClasses, cntk_nrRois, cntk_padWidth, cntk_padHeight)
 arguments = {
     model.arguments[0]: [np.ascontiguousarray(np.array(imgPadded, dtype=np.float32).transpose(2, 0, 1))], # convert to CNTK's HWC format
-    model.arguments[1]: [np.array(roisCntk)]
+    model.arguments[1]: [np.array(roisCntk, np.float32)]
 }
 print("Time cnkt input generation [ms]: " + str((datetime.datetime.now() - tstart).total_seconds() * 1000))
 

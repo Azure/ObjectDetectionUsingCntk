@@ -34,7 +34,7 @@ Previous expertise with Machine Learning while not required to complete this tut
 PREREQUISITS
 --------------
 
-This tutorial requires CNTK release 2.0.beta11 with either Python 3.5-64bit (recommended) or Python 3.4-64bit. Note that 2.0.beta12 and higher introduced breaking changes, and hence version beta11 is currently a requirement.
+This tutorial requires CNTK 2.0.rc1 (release candidate 1) or higher with either Python 3.5-64bit (recommended) or Python 3.4-64bit. Note that the code will not run on previous CNTK versions due to breaking changes introduced in 2.0.rc1.
 
 A dedicated GPU is not required, but recommended for retraining of the Neural Network (part 2). If you lack a strong GPU, don't want to install CNTK yourself, or want to train a model using multiple GPUs, then consider using Azure's Data Science Virtual Machine. See the [Cortana Intelligence Gallery](https://gallery.cortanaintelligence.com/Solution/Linux-Data-Science-Virtual-Machine-3) for a 1-click deployment solution.
 
@@ -47,11 +47,11 @@ The only change needed to instead install Python 3.4 is by adding the string '-P
 ````
 -->
 
-In the following, we assume that the python interpreter is in *C:/local/Anaconda3-4.1.1-Windows-x86_64/* and the CNTK root directory is  *C:/local/CNTK-2-0-beta8-0-Windows-64bit-GPU/*.
+In the following, we assume that the python interpreter is in *C:/local/Anaconda3-4.1.1-Windows-x86_64/* and the CNTK root directory is  *C:/local/CNTK-2-0-rc1/*.
 
 Several Python packages are required to execute the python scripts: Pillow, xmltodict, wheel, numpy, opencv, scikit-learn, scipy, matplotlib, scikit-image and easydict. These libraries can be installed easily using provided python wheels by opening a command prompt and running:
 ````bash
-C:/local/CNTK-2-0-beta11-0-Windows-64bit-GPU/cntk/Scripts/cntkpy35.bat
+C:/local/CNTK-2-0-rc1/cntk/Scripts/cntkpy35.bat
 cd resources/python35_64bit_requirements/
 pip.exe install -r requirements.txt
 ````
@@ -60,10 +60,6 @@ The python wheels were originally downloaded from this [page](http://www.lfd.uci
 Finally, the file *AlexNet.model* is too big to be hosted in Github and hence needs to be downloaded manually from [here](https://www.cntk.ai/Models/AlexNet/AlexNet.model) and placed into the subfolder */resources/cntk/AlexNet.model*.
 
 Troubleshooting:
-- If the CNTK binaries are not located at "C:/local/CNTK-2-0-beta11-0-Windows-64bit-GPU/cntk/cntk/", then the variable `cntkBinariesDir` in `PARAMETERS.py` needs to be updated to point to the correct directory:
-```python
-cntkBinariesDir = "<myCntkBinariesDirectory>"
-```
 - Typically *pip.exe* comes installed with Python. If that is not the case on your system, then this command should install it:
 ````bash
 python -m ensurepip
@@ -84,6 +80,7 @@ FOLDER STRUCTURE
 |/data/grocery/positives/|	Images and annotations to train the model
 |/data/grocery/negatives/|	Images used as negatives during model training
 |/data/grocery/testImages/|	Test images used to evaluate model accuracy
+|/doc/|	Resources such as images for this readme page
 |/fastRCNN/|			Slightly modified code used in R-CNN publications
 |/resources/|		  All provided resources are in here
 |/resources/cntk/|   CNTK configuration file and pre-trained AlexNet model
@@ -150,7 +147,7 @@ This step writes the above mentioned files to the directory *proc/grocery/cntkFi
 
 We can now run the CNTK training which takes as input the co-ordinates and labels files from the last step and writes the 4096 float embedding for each ROI and for each image to *proc/grocery/cntkFiles/{train,test}_svm_parsed/[imageName].dat.npz*. This will take a few minutes, and will automatically run on GPU if detected.
 
-Note: Look for the line "Using GPU for training." in the console output to make sure the training runs on GPU and not CPU (which would be too slow). It happened to me many times that a previous CNTK run was still open and holding a block on the GPU.
+Note: Look for the line "Using GPU for training." in the console output to make sure the training runs on GPU and not CPU (which would be too slow). Note that a previous CNTK run might still be open and holding a block on the GPU.
 
 
 ### STEP 4: Classifier training

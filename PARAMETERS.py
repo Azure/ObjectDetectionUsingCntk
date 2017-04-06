@@ -1,5 +1,5 @@
 from __future__ import print_function
-from cntk_helpers import *
+from helpers import *
 from imdb_data import imdb_data
 import fastRCNN, time, datetime
 from fastRCNN.pascal_voc import pascal_voc
@@ -11,8 +11,6 @@ print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 # to make scripts run
 ############################
 rootDir = os.path.dirname(os.path.realpath(sys.argv[0]))
-cntkBinariesDir = "C:/local/CNTK-2-0-beta11-0-Windows-64bit-GPU/cntk/cntk/"
-
 
 ############################
 # default parameters
@@ -64,7 +62,7 @@ cntk_momentum_time_constant = 10 # momentum
 # svm training
 svm_C = 0.001             # regularization parameter of the soft-margin error term
 svm_B = 10.0              # intercept scaling
-svm_nrEpochs = 5          # number of training iterations
+svm_nrEpochs = 3          # number of training iterations
 svm_retrainLimit = 2000   # number of new items to trigger SVM training
 svm_evictThreshold = -1.1 # remove easy negatives with decision value below this threshold
 svm_posWeight = "auto"    # automatically balance training set to correct for the majority of ROIs being negative

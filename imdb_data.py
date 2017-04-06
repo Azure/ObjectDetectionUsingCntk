@@ -8,7 +8,7 @@
 from __future__ import print_function
 from builtins import range
 import sys, os
-from cntk_helpers import *
+from helpers import *
 import scipy.sparse
 import scipy.io as sio
 import pickle as cp

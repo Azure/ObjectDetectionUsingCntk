@@ -1,6 +1,5 @@
 from PARAMETERS import *
-import numpy as np
-import os, sys, pdb
+from helpers_cntk import *
 
 
 ####################################
