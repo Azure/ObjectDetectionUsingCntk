@@ -1,5 +1,4 @@
 import os, importlib, sys
-from cntk_helpers import *
 import PARAMETERS
 locals().update(importlib.import_module("PARAMETERS").__dict__)
 
