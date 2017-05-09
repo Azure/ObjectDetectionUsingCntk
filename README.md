@@ -332,10 +332,7 @@ The evaluation script `5_evaluateResults.py` can be used to verify that the SVM 
 
 ### Publishing the model as Rest API
 
-Finally, the trained model can be used to create a web service or Rest API on Azure. For this we recommend using a technology called Flask, which makes it easy to run Python code in the cloud. See the tutorial [Creating web apps with Flask in Azure](https://azure.microsoft.com/en-us/documentation/articles/web-sites-python-create-deploy-flask-app/) for step-by-step instructions.
-
-**Update v1 (Feb 2017):**
-At the time of writing Azure Flask does not support 64 bit Python out-of-the-box, however CNTK is 64 bit only. We are currently looking into this and hope to have an update here within the next weeks. In the meantime, one could probably follow a similar approach as was done [here](https://github.com/ilkarman/Blog/blob/master/rndm/AzureWebApp.md), or alternatively use the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
+Finally, the trained model can be used to create a web service or Rest API on Azure. For this, we recommend using a technology called Flask, which makes it easy to run Python code in the cloud. See the tutorial [Creating web apps with Flask in Azure](https://azure.microsoft.com/en-us/documentation/articles/web-sites-python-create-deploy-flask-app/) for an introduction to Flask, and the GitHub repo [Azure-WebApp-w-CNTK](https://github.com/ilkarman/Azure-WebApp-w-CNTK) for an example how to deploy and run CNTK inside a web-service on Azure. 
 
 
 
