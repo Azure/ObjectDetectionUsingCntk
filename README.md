@@ -3,6 +3,8 @@ Fast R-CNN Object Detection Tutorial for Microsoft Cognitive Toolkit (CNTK)
 ==============
 
 ```diff
++ Update v2 (June 2017):
++ Updated code to be compatible with the CNTK 2.0.0 release.
 + Update v1 (Feb 2017):
 + This tutorial was updated to use CNTK's python wrappers. Now all processing happens in-memory during scoring. See script 6_runSingleImage for an example. Furthermore, we switched to a much more accurate and faster implementation of Selective Search.
 + Note that, at the time of writing, CNTK does not support Python 2. If you need Python 2 then please refer to the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
@@ -34,42 +36,31 @@ Previous expertise with Machine Learning while not required to complete this tut
 PREREQUISITS
 --------------
 
-This tutorial requires CNTK release 2.0.beta11 with either Python 3.5-64bit (recommended) or Python 3.4-64bit. Note that 2.0.beta12 and higher introduced breaking changes, and hence version beta11 is currently a requirement.
+This tutorial was tested using CNTK v2.0.0, and assumes that CNTK was installed with the (default) Anaconda Python interpreter. Note that the code will not run on previous versions of CNTK due to breaking changes.
+
+CNTK can be easily installed by following the instructions on the [script-driven installation page](https://github.com/Microsoft/CNTK/wiki/Setup-Windows-Binary-Script). This will also automatically add an Anaconda Python distribution. At the time of writing, the default python version is 3.5.
 
 A dedicated GPU is not required, but recommended for retraining of the Neural Network (part 2). If you lack a strong GPU, don't want to install CNTK yourself, or want to train a model using multiple GPUs, then consider using Azure's Data Science Virtual Machine. See the [Cortana Intelligence Gallery](https://gallery.cortanaintelligence.com/Solution/Linux-Data-Science-Virtual-Machine-3) for a 1-click deployment solution.
-
-CNTK can be easily installed by following the instructions on the [setup page](https://github.com/Microsoft/CNTK/wiki/Setup-Windows-Binary-Script). This will also automatically add an Anaconda Python distribution. At the time of writing, the default python version is 3.5.
 
 <!--
 The only change needed to instead install Python 3.4 is by adding the string '-PyVersion 34' when starting the installation:
 ````bash
 *./install.ps1 -execute -PyVersion 34
 ````
--->
 
 In the following, we assume that the python interpreter is in *C:/local/Anaconda3-4.1.1-Windows-x86_64/* and the CNTK root directory is  *C:/local/CNTK-2-0-beta8-0-Windows-64bit-GPU/*.
 
-Several Python packages are required to execute the python scripts: Pillow, xmltodict, wheel, numpy, opencv, scikit-learn, scipy, matplotlib, scikit-image and easydict. These libraries can be installed easily using provided python wheels by opening a command prompt and running:
+-->
+
+Several Python packages are required to execute the python scripts. These libraries can be installed easily using provided python wheels by opening a command prompt and running:
 ````bash
-C:/local/CNTK-2-0-beta11-0-Windows-64bit-GPU/cntk/Scripts/cntkpy35.bat
+c:/local/CNTK-2-0/cntk/Scripts/cntkpy35.bat
 cd resources/python35_64bit_requirements/
 pip.exe install -r requirements.txt
 ````
 The python wheels were originally downloaded from this [page](http://www.lfd.uci.edu/~gohlke/pythonlibs/).
 
 Finally, the file *AlexNet.model* is too big to be hosted in Github and hence needs to be downloaded manually from [here](https://www.cntk.ai/Models/AlexNet/AlexNet.model) and placed into the subfolder */resources/cntk/AlexNet.model*.
-
-Troubleshooting:
-- If the CNTK binaries are not located at "C:/local/CNTK-2-0-beta11-0-Windows-64bit-GPU/cntk/cntk/", then the variable `cntkBinariesDir` in `PARAMETERS.py` needs to be updated to point to the correct directory:
-```python
-cntkBinariesDir = "<myCntkBinariesDirectory>"
-```
-- Typically *pip.exe* comes installed with Python. If that is not the case on your system, then this command should install it:
-````bash
-python -m ensurepip
-````
-
-
 
 
 

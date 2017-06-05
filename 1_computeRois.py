@@ -45,7 +45,7 @@ for subdir in subdirs:
         tstart = datetime.datetime.now()
         rois = computeRois(imgOrig, boAddSelectiveSearchROIs, boAddGridROIs, boFilterROIs, ss_kvals, ss_minSize, ss_max_merging_iterations, ss_nmsThreshold,
                            roi_minDimRel, roi_maxDimRel, roi_maxImgDim, roi_maxAspectRatio, roi_minNrPixelsRel, roi_maxNrPixelsRel,
-                           grid_nrScales, grid_aspectRatios, grid_downscaleRatioPerIteration)
+                           grid_nrScales, grid_aspectRatios, grid_downscaleRatioPerIteration, grid_stepSizeRel)
         times.append((datetime.datetime.now() - tstart).total_seconds() * 1000)
         print("   Time roi computation [ms]: " + str((datetime.datetime.now() - tstart).total_seconds() * 1000))
         roiPath = "{}/{}/{}.roi.txt".format(roiDir, subdir, imgFilename[:-4])

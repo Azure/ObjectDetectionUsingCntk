@@ -11,7 +11,6 @@ print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 # to make scripts run
 ############################
 rootDir = os.path.dirname(os.path.realpath(sys.argv[0]))
-cntkBinariesDir = "C:/local/CNTK-2-0-beta11-0-Windows-64bit-GPU/cntk/cntk/"
 
 
 ############################
@@ -40,7 +39,8 @@ ss_minSize = 20                 # for a description of the selective search para
 ss_kvals   = (50, 500, 6)       #   http://dlib.net/dlib/image_transforms/segment_image_abstract.h.html#find_candidate_object_locations
 ss_max_merging_iterations = 20  #
 ss_nmsThreshold = 0.85          # non-maxima surpression threshold run after selective search
-grid_nrScales = 7                     # uniform grid ROIs: number of iterations from largest possible ROI to smaller ROIs
+grid_nrScales = 7               # uniform grid ROIs: number of iterations from largest possible ROI to smaller ROIs
+grid_stepSizeRel = 0.5          # uniform grid ROIs: step size for sliding windows
 grid_aspectRatios = [1.0, 2.0, 0.5]    # uniform grid ROIs: allowed aspect ratio of ROIs
 grid_downscaleRatioPerIteration = 1.5  # uniform grid ROIs: relative ROI width/height reduction per iteration, starting from largest possible ROI
 
@@ -64,7 +64,7 @@ cntk_momentum_time_constant = 10 # momentum
 # svm training
 svm_C = 0.001             # regularization parameter of the soft-margin error term
 svm_B = 10.0              # intercept scaling
-svm_nrEpochs = 5          # number of training iterations
+svm_nrEpochs = 2          # number of training iterations
 svm_retrainLimit = 2000   # number of new items to trigger SVM training
 svm_evictThreshold = -1.1 # remove easy negatives with decision value below this threshold
 svm_posWeight = "auto"    # automatically balance training set to correct for the majority of ROIs being negative

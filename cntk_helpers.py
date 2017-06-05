@@ -4,24 +4,22 @@ from builtins import str
 from builtins import range
 from builtins import object
 from past.utils import old_div
-import pdb, sys, os, time, random, collections, dlib
+import pdb, sys, os, time, collections, random, dlib
 from os.path import join
 import numpy as np
 from easydict import EasyDict
 from fastRCNN.nms import nms as nmsPython
 
-from cntk import Trainer, UnitType, load_model
-from cntk.blocks import Placeholder, Constant
-from cntk.device import default #gpu, set_default_device
-from cntk.graph import find_by_name, plot
+from cntk import load_model, Trainer, UnitType, use_default_device, placeholder, constant, cross_entropy_with_softmax, classification_error
 from cntk.initializer import glorot_uniform
-from cntk.io import ReaderConfig, ImageDeserializer, CTFDeserializer
-from cntk.learner import momentum_sgd, learning_rate_schedule, momentum_as_time_constant_schedule
-from cntk.ops import input_variable, parameter, cross_entropy_with_softmax, classification_error, times, combine
-from cntk.ops import roipooling
+from cntk.io import MinibatchSource, ImageDeserializer, CTFDeserializer, StreamDefs, StreamDef
+from cntk.layers import placeholder, GlobalAveragePooling, Dropout, Dense
+from cntk.learners import momentum_sgd, learning_rate_schedule, momentum_schedule, momentum_as_time_constant_schedule
+from cntk.logging import log_number_of_parameters, ProgressPrinter, graph
+from cntk.logging.graph import find_by_name
+from cntk.ops import input_variable, parameter, times, combine, roipooling
 from cntk.ops.functions import CloneMethod
-from cntk.utils import log_number_of_parameters, ProgressPrinter
-
+import cntk.io.transforms as xforms
 
 
 ####################################
@@ -63,12 +61,12 @@ def findSelectiveSearchRois_old(img, maxDim = 200, ssScale = 100, ssSigma = 1.2,
     return rois, img, scale
 
 
-def getGridRois(imgWidth, imgHeight, nrGridScales, aspectRatios = [1.0], downscaleRatioPerIteration=2.0):
+def getGridRois(imgWidth, imgHeight, nrGridScales, aspectRatios = [1.0], downscaleRatioPerIteration = 2.0, stepSizeRel = 0.5):
     rois = []
     # start adding large ROIs and then smaller ones
     for iter in range(nrGridScales):
         cellWidth = 1.0 * min(imgHeight, imgWidth) / (downscaleRatioPerIteration ** iter)
-        step = cellWidth / 2.0
+        step = cellWidth * stepSizeRel
 
         for aspectRatio in aspectRatios:
             wStart = 0
@@ -122,7 +120,7 @@ def filterRois(rois, maxWidth, maxHeight, roi_minNrPixels, roi_maxNrPixels,
 
 def computeRois(imgOrig, boAddSelectiveSearchROIs, boAddGridROIs, boFilterROIs, ss_kvals, ss_minSize, ss_max_merging_iterations, ss_nmsThreshold,
                 roi_minDimRel, roi_maxDimRel, roi_maxImgDim, roi_maxAspectRatio, roi_minNrPixelsRel, roi_maxNrPixelsRel,
-                grid_nrScales, grid_aspectRatios, grid_downscaleRatioPerIteration, boVerbose = True):
+                grid_nrScales, grid_aspectRatios, grid_downscaleRatioPerIteration, grid_stepSizeRel, boVerbose = True):
     # compute absolute pixel values
     roi_minDim = roi_minDimRel * roi_maxImgDim
     roi_maxDim = roi_maxDimRel * roi_maxImgDim
@@ -143,7 +141,7 @@ def computeRois(imgOrig, boAddSelectiveSearchROIs, boAddGridROIs, boFilterROIs, 
 
     # add grid rois
     if boAddGridROIs:
-        roisGrid = getGridRois(imgWidth, imgHeight, grid_nrScales, grid_aspectRatios, grid_downscaleRatioPerIteration)
+        roisGrid = getGridRois(imgWidth, imgHeight, grid_nrScales, grid_aspectRatios, grid_downscaleRatioPerIteration, grid_stepSizeRel)
         if boVerbose:
             print("   Number of rois on grid added: " + str(len(roisGrid)))
         rois += roisGrid
@@ -241,9 +239,9 @@ def roiCntkLabelsString(overlaps, thres, nrClasses):
     return oneHotString
 
 
-def getCntkInputs(imgPath, currRois, currGtOverlaps, train_posOverlapThres, nrClasses, cntk_nrRois, cntk_padWidth, cntk_padHeight):
+def getCntkInputs(imgOrImgPath, currRois, currGtOverlaps, train_posOverlapThres, nrClasses, cntk_nrRois, cntk_padWidth, cntk_padHeight):
     # all rois need to be scaled + padded to cntk input image size
-    imgWidth, imgHeight = imWidthHeight(imgPath)
+    imgWidth, imgHeight = imWidthHeight(imgOrImgPath)
     targetw, targeth, w_offset, h_offset, scale = roiTransformPadScaleParams(
         imgWidth, imgHeight, cntk_padWidth, cntk_padHeight)
 
@@ -286,23 +284,20 @@ def create_mb_source(data_set, img_height, img_width, n_classes, n_rois, data_pa
 
     # read images
     nrImages = len(readTable(map_file))
-    image_source = ImageDeserializer(map_file)
-    image_source.ignore_labels()
-    image_source.map_features('features',
-                              [ImageDeserializer.scale(width=img_width, height=img_height, channels=3,
-                                                       scale_mode="pad", pad_value=114, interpolations='linear')])
+    transforms = [xforms.scale(width=img_width, height=img_height, channels=3, scale_mode = "pad", pad_value = 114, interpolations = 'linear')]
+    image_source = ImageDeserializer(map_file, StreamDefs(features = StreamDef(field='image', transforms=transforms)))
 
     # read rois and labels
     rois_dim  = 4 * n_rois
     label_dim = n_classes * n_rois
-    roi_source = CTFDeserializer(roi_file)
-    roi_source.map_input('rois', dim=rois_dim, format="dense")
-    label_source = CTFDeserializer(label_file)
-    label_source.map_input('roiLabels', dim=label_dim, format="dense")
+    roi_source = CTFDeserializer(roi_file, StreamDefs(
+    rois = StreamDef(field='rois', shape=rois_dim, is_sparse=False)))
+    label_source = CTFDeserializer(label_file, StreamDefs(
+    roiLabels = StreamDef(field='roiLabels', shape=label_dim, is_sparse=False)))
 
     # define a composite reader
-    rc = ReaderConfig([image_source, roi_source, label_source], epoch_size=sys.maxsize, randomize=randomize)
-    return (rc.minibatch_source(), nrImages)
+    mbSource = MinibatchSource([image_source, roi_source, label_source], max_samples=sys.maxsize, randomize=randomize)
+    return(mbSource, nrImages)
 
 
 # Defines the Fast R-CNN network model for detecting objects in images
@@ -325,11 +320,11 @@ def frcn_predictor(features, rois, n_classes, base_path):
     last_node    = find_by_name(loaded_model, last_hidden_node_name)
 
     # Clone the conv layers and the fully connected layers of the network
-    conv_layers = combine([conv_node.owner]).clone(CloneMethod.freeze, {feature_node: Placeholder()})
-    fc_layers   = combine([last_node.owner]).clone(CloneMethod.clone,  {pool_node: Placeholder()})
+    conv_layers = combine([conv_node.owner]).clone(CloneMethod.freeze, {feature_node: placeholder()})
+    fc_layers   = combine([last_node.owner]).clone(CloneMethod.clone,  {pool_node: placeholder()})
 
     # Create the Fast R-CNN model
-    feat_norm = features - Constant(114)
+    feat_norm = features - constant(114)
     conv_out  = conv_layers(feat_norm)
     roi_out   = roipooling(conv_out, rois, (roi_dim, roi_dim))
     fc_out    = fc_layers(roi_out)
@@ -347,7 +342,7 @@ def init_train_fast_rcnn(image_height, image_width, num_classes, num_rois, mb_si
                          momentum_time_constant, base_path, boSkipTraining = False, debug_output=False):
 
     #make sure we use GPU for training
-    if default().type() == 0:
+    if use_default_device().type() != 0:
         print("WARNING: using CPU for training.")
     else:
         print("Using GPU for training.")
@@ -365,6 +360,7 @@ def init_train_fast_rcnn(image_height, image_width, num_classes, num_rois, mb_si
     # Create the minibatch source and define mapping from reader streams to network inputs
     minibatch_source, epoch_size = create_mb_source("train", image_height, image_width, num_classes, num_rois,
                                                     base_path, randomize=True)
+
     input_map = {
         image_input: minibatch_source['features'],
         roi_input: minibatch_source['rois'],
@@ -402,7 +398,7 @@ def init_train_fast_rcnn(image_height, image_width, num_classes, num_rois, mb_si
 
         progress_printer.epoch_summary(with_metric=True)
         if debug_output:
-            frcn_output.save_model("frcn_py_%s.model" % (epoch + 1))
+            frcn_output.save("frcn_py_%s.model" % (epoch + 1))
 
     return frcn_output
 
@@ -420,7 +416,7 @@ def run_fast_rcnn(model, data_set, image_height, image_width, num_classes, num_r
         if imgIndex % 100 == 1:
             print("Evaluating images {} of {}".format(imgIndex, num_images))
         data = minibatch_source.next_minibatch(1, input_map=input_map)
-        output = model.eval(data)[0, 0]
+        output = model.eval(data)[0] #.squeeze()
         output = np.array(output, np.float32)
 
         # write to disk
@@ -851,6 +847,9 @@ def getFilesInDirectory(directory, postfix = ""):
         return fileNames
     else:
         return [s for s in fileNames if s.lower().endswith(postfix)]
+
+def getDirectoriesInDirectory(directory):
+    return [s for s in os.listdir(directory) if os.path.isdir(directory+"/"+s)]
 
 def readFile(inputFile):
     # reading as binary, to avoid problems with end-of-text characters

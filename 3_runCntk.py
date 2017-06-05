@@ -23,7 +23,7 @@ model = init_train_fast_rcnn(cntk_padHeight, cntk_padWidth, nrClasses, cntk_nrRo
 # write model to disk
 model_path = os.path.join(modelDir, "frcn_" + classifier + ".model")
 print("Writing model to %s" % model_path)
-model.save_model(model_path)
+model.save(model_path)
 
 # compute output of every image and write to disk
 image_sets = ["test", "train"]

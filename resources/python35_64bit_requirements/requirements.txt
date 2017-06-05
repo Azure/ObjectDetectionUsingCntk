@@ -1,18 +1,6 @@
-#--find-links wheelhouse
-future
-Flask==0.10.1
-wfastcgi==2.2
-requests==2.8.1
-Pillow
-xmltodict==0.9.2
-redis
-wheel==0.26.0
-numpy
-#./numpy-1.11.3+mkl-cp35-cp35m-win_amd64.whl
 ./opencv_python-3.2.0-cp35-cp35m-win_amd64.whl
 scikit-learn
-scipy
-matplotlib
-./scikit_image-0.12.3-cp35-cp35m-win_amd64.whl
+Pillow
+future
+dlib
 EasyDict
-./dlib-19.1.0-cp35-cp35m-win_amd64.whl
