@@ -58,7 +58,8 @@ c:/local/CNTK-2-0/cntk/Scripts/cntkpy35.bat
 cd resources/python35_64bit_requirements/
 pip.exe install -r requirements.txt
 ````
-The python wheels were originally downloaded from this [page](http://www.lfd.uci.edu/~gohlke/pythonlibs/).
+
+In the code snippet above, we assumed that the CNTK root directory is C:/local/CNTK-2-0/. The python wheels were originally downloaded from this [page](http://www.lfd.uci.edu/~gohlke/pythonlibs/).
 
 Finally, the file *AlexNet.model* is too big to be hosted in Github and hence needs to be downloaded manually from [here](https://www.cntk.ai/Models/AlexNet/AlexNet.model) and placed into the subfolder */resources/cntk/AlexNet.model*.
 
@@ -79,7 +80,6 @@ FOLDER STRUCTURE
 |/fastRCNN/|			Slightly modified code used in R-CNN publications
 |/resources/|		  All provided resources are in here
 |/resources/cntk/|   CNTK configuration file and pre-trained AlexNet model
-|/resources/python34_64_bit_requirements/|   Python wheels and requirements file for 64bit Python version 3.4
 |/resources/python35_64_bit_requirements/|   Python wheels and requirements file for 64bit Python version 3.5
 
 
