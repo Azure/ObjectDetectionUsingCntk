@@ -48,7 +48,7 @@ The only change needed to instead install Python 3.4 is by adding the string '-P
 *./install.ps1 -execute -PyVersion 34
 ````
 
-In the following, we assume that the python interpreter is in *C:/local/Anaconda3-4.1.1-Windows-x86_64/* and the CNTK root directory is  *C:/local/CNTK-2-0-beta8-0-Windows-64bit-GPU/*.
+In the following, we assume that the python interpreter is in *C:/local/Anaconda3-4.1.1-Windows-x86_64/* and the CNTK root directory is  *C:/local/CNTK-2-0-rc1/*.
 
 -->
 
@@ -75,6 +75,7 @@ FOLDER STRUCTURE
 |/data/grocery/positives/|	Images and annotations to train the model
 |/data/grocery/negatives/|	Images used as negatives during model training
 |/data/grocery/testImages/|	Test images used to evaluate model accuracy
+|/doc/|	Resources such as images for this readme page
 |/fastRCNN/|			Slightly modified code used in R-CNN publications
 |/resources/|		  All provided resources are in here
 |/resources/cntk/|   CNTK configuration file and pre-trained AlexNet model
@@ -141,7 +142,7 @@ This step writes the above mentioned files to the directory *proc/grocery/cntkFi
 
 We can now run the CNTK training which takes as input the co-ordinates and labels files from the last step and writes the 4096 float embedding for each ROI and for each image to *proc/grocery/cntkFiles/{train,test}_svm_parsed/[imageName].dat.npz*. This will take a few minutes, and will automatically run on GPU if detected.
 
-Note: Look for the line "Using GPU for training." in the console output to make sure the training runs on GPU and not CPU (which would be too slow). It happened to me many times that a previous CNTK run was still open and holding a block on the GPU.
+Note: Look for the line "Using GPU for training." in the console output to make sure the training runs on GPU and not CPU (which would be too slow). Note that a previous CNTK run might still be open and holding a block on the GPU.
 
 
 ### STEP 4: Classifier training
@@ -185,7 +186,8 @@ Results using 2000 ROIs:
 |Training set|1.00       |0.76      |1.00      |1.00          |...|**0.89**
 |Test Set|    1.00       |0.55      |0.64      |1.00          |   |**0.88**
 
-The output of the classifier can be visualized using the script `5_visualizeResults.py`. Only ROIs classified as grocery item are shown (not background), and only if the confidence in the detection is greater or above 0.5. Multiple ROIs are combined into single detections using   [Non-Maxima Suppression](#non-maxima-suppression), the output of which is visualized below for the test images:  
+The output of the classifier can be visualized using the script `5_visualizeResults.py`. Only ROIs classified as grocery item are shown (not background), and only if the confidence in the detection is greater or above 0.5. Multiple ROIs are combined into single detections using   [Non-Maxima Suppression](#non-maxima-suppression), the output of which is visualized below for the test images.
+
 <p align="center">
 <img src="doc/svm_0WIN_20160803_11_28_42_Pro.jpg" alt="alt text" height="300"/>
 <img src="doc/svm_1WIN_20160803_11_42_36_Pro.jpg" alt="alt text" height="300"/>
@@ -193,6 +195,13 @@ The output of the classifier can be visualized using the script `5_visualizeResu
 <img src="doc/svm_3WIN_20160803_11_48_26_Pro.jpg" alt="alt text" height="300"/>
 <img src="doc/svm_4WIN_20160803_12_37_07_Pro.jpg" alt="alt text" height="300"/>
 </p>
+
+In addition to visualizing the detected objects, script `5_visualizeResults.py` also computes precision and recall after rejecting detections with confidence scores less than a given threshold. This information can be used to set an operating point of the final classifier: for example, given the table below, to reach 85% precision all detections with score less than 5.0 would have to be rejected.
+
+<p align="center">
+<img src="doc/precision_recall.jpg" alt="alt text" height="300"/>
+</p>
+
 
 
 ### STEP 6: Scoring images
@@ -318,10 +327,7 @@ The evaluation script `5_evaluateResults.py` can be used to verify that the SVM 
 
 ### Publishing the model as Rest API
 
-Finally, the trained model can be used to create a web service or Rest API on Azure. For this we recommend using a technology called Flask, which makes it easy to run Python code in the cloud. See the tutorial [Creating web apps with Flask in Azure](https://azure.microsoft.com/en-us/documentation/articles/web-sites-python-create-deploy-flask-app/) for step-by-step instructions.
-
-**Update v1 (Feb 2017):**
-At the time of writing Azure Flask does not support 64 bit Python out-of-the-box, however CNTK is 64 bit only. We are currently looking into this and hope to have an update here within the next weeks. In the meantime, one could probably follow a similar approach as was done [here](https://github.com/ilkarman/Blog/blob/master/rndm/AzureWebApp.md), or alternatively use the [previous version](https://github.com/Azure/ObjectDetectionUsingCntk/tree/7edd3276a189bad862dc54e9f73b7cfcec5ae562) of this tutorial.
+Finally, the trained model can be used to create a web service or Rest API on Azure. For this, we recommend using a technology called Flask, which makes it easy to run Python code in the cloud. See the tutorial [Creating web apps with Flask in Azure](https://azure.microsoft.com/en-us/documentation/articles/web-sites-python-create-deploy-flask-app/) for an introduction to Flask, and the GitHub repo [Azure-WebApp-w-CNTK](https://github.com/ilkarman/Azure-WebApp-w-CNTK) for an example how to deploy and run CNTK inside a web-service on Azure.
 
 
 

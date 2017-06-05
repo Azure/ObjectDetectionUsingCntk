@@ -4,7 +4,6 @@ import PARAMETERS
 locals().update(importlib.import_module("PARAMETERS").__dict__)
 
 
-
 ####################################
 # Parameters
 ####################################

@@ -1,5 +1,5 @@
 from __future__ import print_function
-from cntk_helpers import *
+from helpers import *
 from imdb_data import imdb_data
 import fastRCNN, time, datetime
 from fastRCNN.pascal_voc import pascal_voc
@@ -11,7 +11,6 @@ print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 # to make scripts run
 ############################
 rootDir = os.path.dirname(os.path.realpath(sys.argv[0]))
-
 
 ############################
 # default parameters
@@ -51,7 +50,7 @@ cntk_padHeight  = 1000     # DNN input image height [pixels]
 cntk_featureDimensions = {'svm': 4096} # DNN output, dimension of each ROI
 
 # nn and svm training
-classifier = 'svm'               # Options: 'svm', 'nn'. Train either a Support Vector Machine, or directly the Neural Network
+classifier = 'nn'               # Options: 'svm', 'nn'. Train either a Support Vector Machine, or directly the Neural Network
 train_posOverlapThres = 0.5      # DNN and SVM threshold for marking ROIs with significant overlap with a GT object as positive
 
 # nn training

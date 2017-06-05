@@ -13,7 +13,7 @@ from __future__ import print_function
 import os, sys, cv2, numpy as np, pickle as cp, heapq
 from .nms import nms as nmsPython
 from .timer import Timer
-from cntk_helpers import im_detect, apply_nms
+from helpers import im_detect, apply_nms
 from builtins import range
 import pdb
 
@@ -379,4 +379,4 @@ def test_net(net, imdb, output_dir, feature_scale, classifier = 'svm', nmsThresh
         nms_dets = all_boxes
 
     print ('Evaluating detections')
-    imdb.evaluate_detections(nms_dets, output_dir, overlapThreshold)
+    return imdb.evaluate_detections(nms_dets, output_dir, overlapThreshold)

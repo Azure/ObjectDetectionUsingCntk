@@ -282,6 +282,7 @@ class pascal_voc(imdb):
             self._do_matlab_eval(comp_id, output_dir)
         else:
             self._do_python_eval(output_dir, use_07_metric)
+        return []
 
     def _do_matlab_eval(self, comp_id, output_dir='output'):
         rm_results = self.config['cleanup']

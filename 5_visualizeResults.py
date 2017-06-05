@@ -99,9 +99,14 @@ for imgIndex in range(0, imdb.num_images):
 
 #compute precision and recall at different thresholds
 print("Precision/recall when rejecting detections below a given threshold:")
+outPR = [("Threshold", "Precision", "Recall")]
 for thres in prThresholds:
     if precisions[thres] == []:
         break
-    print("   At threshold {:.2f}: precision = {:2.2f}, recall = {:2.2f}".format(thres, np.mean(precisions[thres]), np.mean(recalls[thres])))
+    p = np.mean(precisions[thres])
+    r = np.mean(recalls[thres])
+    outPR.append((thres, p, r))
+    print("   At threshold {:.2f}: precision = {:2.2f}, recall = {:2.2f}".format(thres, p, r))
+#writeTable("precisionRecalls.tsv", outPR)
 
 print("DONE.")

@@ -9,7 +9,9 @@ locals().update(importlib.import_module("PARAMETERS").__dict__)
 ####################################
 # Parameters
 ####################################
-print("classifier = " + classifier)
+cntkBinariesDir = "C:/local/CNTK-2-0-rc1/cntk/cntk/"
+
+# no need to change this
 cntkCmdStrPattern = "{0}/cntk.exe configFile={1}config.cntk currentDirectory={1}"
 
 
@@ -17,6 +19,9 @@ cntkCmdStrPattern = "{0}/cntk.exe configFile={1}config.cntk currentDirectory={1}
 ####################################
 # Main
 ####################################
+print("classifier = " + classifier)
+if not os.path.exists(cntkBinariesDir + "/cntk.exe"):
+    raise Exception("Cannot find cntk.exe in directory: " + cntkBinariesDir)
 deleteAllFilesInDirectory(cntkFilesDir + "/tmp", None)
 shutil.copy(os.path.join(cntkResourcesDir, "config.cntk"), cntkFilesDir)
 
