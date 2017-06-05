@@ -772,8 +772,7 @@ def sortDictionary(dictionary, sortIndex=0, reverseSort=False):
 
 def imread(imgPath, boThrowErrorIfExifRotationTagSet = True):
     if not os.path.exists(imgPath):
-        print("ERROR: image path does not exist.")
-        error
+        raise Exception("ERROR: image path does not exist.")
 
     rotation = rotationFromExifTag(imgPath)
     if boThrowErrorIfExifRotationTagSet and rotation != 0:
