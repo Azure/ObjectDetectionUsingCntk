@@ -3,6 +3,8 @@ Fast R-CNN Object Detection Tutorial for Microsoft Cognitive Toolkit (CNTK)
 ==============
 
 ```diff
++ Update V2.0.1 (June 2017):
++ Updated documentation to include Visual Object Tagging Tool as an annotation option.
 + Update v2 (June 2017):
 + Updated code to be compatible with the CNTK 2.0.0 release.
 + Update v1 (Feb 2017):
@@ -33,7 +35,7 @@ Previous expertise with Machine Learning while not required to complete this tut
 
 
 
-PREREQUISITS
+PREREQUISITES
 --------------
 
 This tutorial was tested using CNTK v2.0.0, and assumes that CNTK was installed with the (default) Anaconda Python interpreter. Note that the code will not run on previous versions of CNTK due to breaking changes.
@@ -290,6 +292,27 @@ Note how all positive, negative and test images and their annotations are in the
 
 ### Image Annotation
 
+**Option #1: Visual Object Tagging Tool (Recommended)**
+
+The [Visual Object Tagging Tool (VOTT)](https://github.com/CatalystCode/VOTT) is a cross platform annotation tool for tagging video and image assets.
+
+![Vott Screen Shot](https://github.com/CatalystCode/VOTT/blob/master/media/4_Tagging_Job.jpg)
+
+VOTT provides the following **features**:
+
+- Computer-assisted tagging and tracking of objects in videos using the [Camshift tracking algorithm](http://opencv.jp/opencv-1.0.0_org/docs/papers/camshift.pdf).
+- Exporting tags and assets to CNTK Fast-RCNN format for training an object detection model.
+- Running and validating a trained CNTK object detection model on new videos to generate stronger models.
+
+How to annotate with VOTT:
+
+1. Download the latest [Release](https://github.com/CatalystCode/VOTT/releases)
+2. Follow the [Readme](https://github.com/CatalystCode/VOTT/blob/master/README.md) to run a tagging job
+3. After tagging Export to the dataset directory
+
+
+**Option #2: Using Annotation Scripts**
+
 These two *.txt* files per image can be generated using the scripts `A1_annotateImages.py` and `A2_annotateBboxLabels.py`.
 
 The first script lets the user draw rectangles around each object (see left image below). Once all objects in an image are annotated, pressing key 'n' writes the *.bboxes.txt* file and then proceeds to the next image, 'u' undoes (i.e. removes) the last rectangle, and 'q' quits the annotation tool.
@@ -302,7 +325,9 @@ The second script loads these manually annotated rectangles for each image, disp
 
 ### Using a custom dataset
 
-Once all (non-negative) images are annotated, the images and *.txt* annotation files should be copied to the *positive*, *negative* and *testImages* subfolders of a new directory called *data/myOwnImages/*, where the string "myOwnImages" can be replaced at will.
+If you used VOTT to generate and export your datatset, it will all ready be in sorted in to positive*, *negative* and *testImages* subfolders. 
+
+Otherwise, once all (non-negative) images are annotated using the annotation scripts, the images and *.txt* annotation files should be copied to the *positive*, *negative* and *testImages* subfolders of a new directory called *data/myOwnImages/*, where the string "myOwnImages" can be replaced at will. 
 
 The only required code change is to update the `datasetName` variable in `PARAMETERS.py` to the newly created folder:
 ```python
