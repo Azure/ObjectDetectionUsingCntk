@@ -38,7 +38,7 @@ Previous expertise with Machine Learning while not required to complete this tut
 PREREQUISITES
 --------------
 
-This tutorial was tested using CNTK v2.0.0, and assumes that CNTK was installed with the (default) Anaconda Python interpreter. Note that the code will not run on previous versions of CNTK due to breaking changes.
+This tutorial was tested using CNTK v2.0.0, and assumes that CNTK was installed with the (default) Anaconda Python interpreter. Note that the code will only run on v2.0 due to breaking changes in other versions.
 
 CNTK can be easily installed by following the instructions on the [script-driven installation page](https://github.com/Microsoft/CNTK/wiki/Setup-Windows-Binary-Script). This will also automatically add an Anaconda Python distribution. At the time of writing, the default python version is 3.5.
 
@@ -90,14 +90,11 @@ All scripts used in this tutorial are located in the root folder.
 
 PART 1
 --------------
-In the first part of this tutorial we will train a classifier which uses, but does not modify, a pre-trained deep neural network. See the [Fast R-CNN](#fast-r-cnn) section for details of the employed approaches. As example data 30 images of grocery items inside refrigerators are provided, split into 25 images for training and the remaining 5 images are used as test set. The training images contain in total 153 annotated objects, these are (with individual counts in brackets):
+In the first part of this tutorial we will train a classifier which uses, but does not modify, a pre-trained deep neural network. See the [Fast R-CNN](#fast-r-cnn) section for details of the employed approaches. As example data 25 images of grocery items inside refrigerators are provided, split into 20 images for training and the remaining 5 images are used as test set. The training images contain in total 180 annotated objects, these are:
 ```
-Avocado (13),  orange (8), butter (13), champagne (12), eggBox (13),
-gerkin (11), joghurt (11), ketchup (14), milk (13), mustard (5),
-orangeJuice (17), onion (10), pepper (27), tabasco (6), tomato (19),
-and water (7).
+Egg box, joghurt, ketchup, mushroom, mustard, orange, squash, and water.
 ```
-Note that 10 to 20 examples per class is a very low number and too little train a high-accuracy detector. Nevertheless, even this small dataset is sufficient to return plausible detections as can be seen in step 5.  
+Note that 20 training images is a very low number and too little train a high-accuracy detector. Nevertheless, even this small dataset is sufficient to return plausible detections as can be seen in step 5.  
 Every step has to be executed in order, and we recommend after each step to inspect which files are written, where they are written to, and what the content of these files is (mostly the content is written as text file).
 
 
@@ -116,9 +113,9 @@ The goodness of these ROIs can be measured by counting how many of the ground tr
 
 ROIs computed using Selective Search (left); ROIs from the image above after discarding ROIs that are too small, too big, etc. (middle); Final set of ROIs after adding ROIs that uniformly cover the image (right).
 <p align="center">
-<img src="doc/WIN_20160803_11_29_07_Pro.noGridNoFiltering.roi.jpg" alt="alt text" height="300"/>
-<img src="doc/WIN_20160803_11_29_07_Pro.noGrid.roi.jpg" alt="alt text" height="300"/>
-<img src="doc/WIN_20160803_11_29_07_Pro.roi.jpg" alt="alt text" height="300"/>
+<img src="doc/0.ss.roi.jpg" alt="alt text" height="300"/>
+<img src="doc/0.filter.roi.jpg" alt="alt text" height="300"/>
+<img src="doc/0.grid.roi.jpg" alt="alt text" height="300"/>
 </p>
 
 
@@ -158,16 +155,12 @@ The training starts by loading all positive ROIs into memory. Positive here corr
 
 The learned linear classifiers for each class, i.e. a weight vector of dimension 4096 floats plus a float that represents the bias term, are then written to the folder *proc/grocery/trainedSVMs/*.
 
-Annotated data used for training: (left) Ground truth annotation; (right) Automatically adding ROIs which significantly overlap with ground truth:  
-<p align="center">
-<img src="doc/WIN_20160803_11_29_07_Pro.cntkNoOverlap.jpg" alt="alt text" height="300"/>
-<img src="doc/WIN_20160803_11_29_07_Pro.cntk.jpg" alt="alt text" height="300"/>
-</p>
+
 
 ### STEP 5: Evaluation and visualization
 `Scripts: 5_evaluateResults.py and 5_visualizeResults.py`
 
-Once training succeeded, the model can be used to find objects in images. For this, every ROI in an image is classified and assigned a confidence to be avocado, orange, butter, ... and background. The class with highest confidence is then selected (most often “background”) and optionally a threshold applied to reject detections with low confidence.
+Once training succeeded, the model can be used to find objects in images. For this, every ROI in an image is classified and assigned a confidence to be orange, ketchup, ... and background. The class with highest confidence is then selected (most often “background”) and optionally a threshold applied to reject detections with low confidence.
 
 The accuracy of the classifier can be measured using the script `5_evaluateResults.py`. This outputs the mean Average Precision (mAP; see the [Mean Average Precision](#mean-average-precision) section) for either the training or the test set.
 Note that mAP's for both set are similar, which indicates that the classifier does not over-fit to the training data. However, keep in mind that the test set only contains 5 images and hence these numbers need to be taken with a grain of salt. Due to randomization effects one should get similar, although likely not identical numbers when running the script.
@@ -176,26 +169,24 @@ Note that mAP's for both set are similar, which indicates that the classifier do
 
 Results using 200 ROIs (this number is too low to get good accuracy but for demo purposes allows for fast training and scoring):
 
-|Dataset|     AP(avocado)|AP(orange)|AP(butter)|AP(champagne)|   | mAP
+|Dataset|     AP(orange)|AP(eggBox)|AP(joghurt)|AP(ketchup)|   | mAP
 |---|---|---|---|---|---|---
-|Training set|0.91       |0.76      |0.46      |0.81          |...|**0.62**
-|Test Set|    0.64       |1.00      |0.64      |1.00          |   |**0.62**
+|Test Set|    0.45       |1.00      |0.82     |0.76          |   |**0.63**
 
 Results using 2000 ROIs:
 
-|Dataset|     AP(avocado)|AP(orange)|AP(butter)|AP(champagne)|   | mAP
+|Dataset|     AP(orange)|AP(eggBox)|AP(joghurt)|AP(ketchup)|   | mAP
 |---|---|---|---|---|---|---
-|Training set|1.00       |0.76      |1.00      |1.00          |...|**0.89**
-|Test Set|    1.00       |0.55      |0.64      |1.00          |   |**0.88**
+|Test Set|    0.32       | 0.48      | 0.82      | 0.82          |   |**0.65**
 
-The output of the classifier can be visualized using the script `5_visualizeResults.py`. Only ROIs classified as grocery item are shown (not background), and only if the confidence in the detection is greater or above 0.5. Multiple ROIs are combined into single detections using   [Non-Maxima Suppression](#non-maxima-suppression), the output of which is visualized below for the test images.
+The output of the classifier usign 2000 ROIs can be visualized using the script `5_visualizeResults.py`. Only ROIs classified as grocery item are shown (not background), and only if the confidence in the detection is greater or above 0.5. Multiple ROIs are combined into single detections using   [Non-Maxima Suppression](#non-maxima-suppression), the output of which is visualized below for the test images.
 
 <p align="center">
-<img src="doc/svm_0WIN_20160803_11_28_42_Pro.jpg" alt="alt text" height="300"/>
-<img src="doc/svm_1WIN_20160803_11_42_36_Pro.jpg" alt="alt text" height="300"/>
-<img src="doc/svm_2WIN_20160803_11_46_03_Pro.jpg" alt="alt text" height="300"/>
-<img src="doc/svm_3WIN_20160803_11_48_26_Pro.jpg" alt="alt text" height="300"/>
-<img src="doc/svm_4WIN_20160803_12_37_07_Pro.jpg" alt="alt text" height="300"/>
+<img src="doc/svm_010.jpg" alt="alt text" height="300"/>
+<img src="doc/svm_45.jpg" alt="alt text" height="300"/>
+<img src="doc/svm_115.jpg" alt="alt text" height="300"/>
+<img src="doc/svm_220.jpg" alt="alt text" height="300"/>
+<img src="doc/svm_325.jpg" alt="alt text" height="300"/>
 </p>
 
 In addition to visualizing the detected objects, script `5_visualizeResults.py` also computes precision and recall after rejecting detections with confidence scores less than a given threshold. This information can be used to set an operating point of the final classifier: for example, given the table below, to reach 85% precision all detections with score less than 5.0 would have to be rejected.
@@ -221,21 +212,19 @@ In part 1 we learned how to classify ROIs by training a linear Support Vector Ma
 
 Training the Neural Network instead of an SVM is done by simply changing the variable `classifier` in `PARAMETERS.py` from "svm" to "nn". Then, as described in part 1, all the scripts need to be executed in order, except for the SVM training in step 4. This will add a classification layer to the network and train the last layer(s) of the network, and for each ROI write its classification label and confidence to disk (rather than the 4096 floats representation which was required to train the SVM). Note that NN training can cause an out-of-memory error on less powerful machines which can possibly be avoided by reducing the minibatch size and if needed also the number of ROIs per image (see variables `cntk_mb_size` and `cntk_nrRois` in `PARAMETERS.py`).
 
-The mean Average Precision measure after running all steps should roughly look like the results below. Note that the accuracy on the training set is much higher compared to training a linear SVM (part 1, step 5). This is because the neural network is less regularized and hence able to memorize the training set better.
+The mean Average Precision measure after running all steps should roughly look like the results below.
 
 Using 200 ROIs:
 
-|Dataset|     AP(avocado)|AP(orange)|AP(butter)|AP(champagne)|   | mAP
+|Dataset|     AP(orange)|AP(eggBox)|AP(joghurt)|AP(ketchup)|   | mAP
 |---|---|---|---|---|---|---
-|Training set|0.91       |1.00      |0.46      |0.91          |...|**0.76**
-|Test Set|    0.36       |1.00      |0.64      |1.00          |   |**0.68**
+|Test Set|    0.45       |0.97      |0.82      |1.00          |   |**0.70**
 
 Using 2000 ROIs:
 
-|Dataset|     AP(avocado)|AP(orange)|AP(butter)|AP(champagne)|   | mAP
+|Dataset|     AP(orange)|AP(eggBox)|AP(joghurt)|AP(ketchup)|   | mAP
 |---|---|---|---|---|---|---
-|Training set|1.00       |1.00      |1.00      |1.00         |...|**0.96**
-|Test Set|    1.00       |1.00      |0.67      |0.75         |   |**0.92**
+|Test Set|    1.00       |0.92      |1.00      |0.07         |   |**0.87**
 
 <!-- AP for         avocado = 1.0000
 AP for          orange = 1.0000
@@ -273,13 +262,13 @@ AP for         tabasco = 0.9762
 AP for         mustard = 1.0000
 Mean AP = 0.9632 -->
 
-The output of the Neural Network on the five test images after Non-Maxima Suppression to combine multiple detections should look like this:  
+The output of the Neural Network with 2000 ROIs on the five test images after Non-Maxima Suppression to combine multiple detections should look like this:  
 <p align="center">
-<img src="doc/nn_0WIN_20160803_11_28_42_Pro.jpg" alt="alt text" height="300"/>
-<img src="doc/nn_1WIN_20160803_11_42_36_Pro.jpg" alt="alt text" height="300"/>
-<img src="doc/nn_2WIN_20160803_11_46_03_Pro.jpg" alt="alt text" height="300"/>
-<img src="doc/nn_3WIN_20160803_11_48_26_Pro.jpg" alt="alt text" height="300"/>
-<img src="doc/nn_4WIN_20160803_12_37_07_Pro.jpg" alt="alt text" height="300"/>
+<img src="doc/nn_01.jpg" alt="alt text" height="300"/>
+<img src="doc/nn_55.jpg" alt="alt text" height="300"/>
+<img src="doc/nn_110.jpg" alt="alt text" height="300"/>
+<img src="doc/nn_215.jpg" alt="alt text" height="300"/>
+<img src="doc/nn_425.jpg" alt="alt text" height="300"/>
 </p>
 
 PART 3
@@ -319,15 +308,15 @@ The first script lets the user draw rectangles around each object (see left imag
 
 The second script loads these manually annotated rectangles for each image, displays them one-by-one, and asks the user to provide the object class by clicking on the respective button to the left of the window (see right image below). Ground truth annotations marked as either "undecided" or "exclude" are fully excluded from further processing.   
 <p align="center">
-<img src="doc/WIN_20160803_11_29_07_Pro.annotateBboxes.jpg" alt="alt text" height="300"/>
-<img src="doc/WIN_20160803_11_29_07_Pro.annotateLabels.jpg" alt="alt text" height="300"/>
+<img src="doc/anno_boxes.jpg" alt="alt text" height="300"/>
+<img src="doc/anno_labels.jpg" alt="alt text" height="300"/>
 </p>
 
 ### Using a custom dataset
 
-If you used VOTT to generate and export your datatset, it will all ready be in sorted in to positive*, *negative* and *testImages* subfolders. 
+If you used VOTT to generate and export your datatset, it will all ready be in sorted in to positive*, *negative* and *testImages* subfolders.
 
-Otherwise, once all (non-negative) images are annotated using the annotation scripts, the images and *.txt* annotation files should be copied to the *positive*, *negative* and *testImages* subfolders of a new directory called *data/myOwnImages/*, where the string "myOwnImages" can be replaced at will. 
+Otherwise, once all (non-negative) images are annotated using the annotation scripts, the images and *.txt* annotation files should be copied to the *positive*, *negative* and *testImages* subfolders of a new directory called *data/myOwnImages/*, where the string "myOwnImages" can be replaced at will.
 
 The only required code change is to update the `datasetName` variable in `PARAMETERS.py` to the newly created folder:
 ```python
@@ -438,8 +427,8 @@ Object detection methods often output multiple detections which fully or partly 
 
 Detection results before (left) and after (right) Non-maxima Suppression:
 <p align="center">
-<img src="doc/nn_4WIN_20160803_12_37_07_Pro.jpg" alt="alt text" height="300"/>
-<img src="doc/nn_noNms4WIN_20160803_12_37_07_Pro.jpg" alt="alt text" height="300"/>
+<img src="doc/nn_00.jpg" alt="alt text" height="300"/>
+<img src="doc/nn_00_no_nms.jpg" alt="alt text" height="300"/>
 </p>
 
 ### Mean Average Precision

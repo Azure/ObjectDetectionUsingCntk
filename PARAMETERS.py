@@ -66,7 +66,7 @@ svm_B = 10.0              # intercept scaling
 svm_nrEpochs = 2          # number of training iterations
 svm_retrainLimit = 2000   # number of new items to trigger SVM training
 svm_evictThreshold = -1.1 # remove easy negatives with decision value below this threshold
-svm_posWeight = "auto"    # automatically balance training set to correct for the majority of ROIs being negative
+svm_posWeight = "balanced"# automatically balance training set to correct for the majority of ROIs being negative
 svm_targetNorm = 20.0     # magic value from traditional R-CNN (helps with convergence)
 svm_penality = 'l2'       # penalty norm
 svm_loss = 'l1'           # loss norm
@@ -89,13 +89,8 @@ evalVocOverlapThreshold = 0.5 # voc-style intersection-over-union threshold used
 ############################
 if datasetName.startswith("grocery"):
     classes = ('__background__',  # always have '__background__' be at index 0
-               "avocado", "orange", "butter", "champagne", "eggBox", "gerkin", "joghurt", "ketchup",
-               "orangeJuice", "onion", "pepper", "tomato", "water", "milk", "tabasco", "mustard")
+               "orange", "eggBox", "joghurt", "ketchup", "squash", "mushroom", "water", "mustard")
 
-    # classes = ('__background__',  # always have '__background__' be at index 0
-    #            "avocado", "orange", "butter", "champagne", "cheese", "eggBox", "gerkin", "joghurt", "ketchup",
-    #            "orangeJuice", "onion", "pepper", "sausage", "tomato", "water", "apple", "milk",
-    #            "tabasco", "soySauce", "mustard", "beer")
 
     # roi generation
     cntk_nrRois = 200    #this number is too low to get good accuracy but allows for fast training and scoring (for demo purposes)

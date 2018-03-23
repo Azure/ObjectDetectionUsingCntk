@@ -617,7 +617,7 @@ def im_detect(net, im, boxes, feature_scale=None, bboxIndices=None, boReturnClas
     # load cntk output for the given image
     cntkOutputPath = join(net.cntkParsedOutputDir, str(im) + ".dat.npz")
     cntkOutput = np.load(cntkOutputPath)['arr_0']
-    if bboxIndices != None:
+    if bboxIndices is not None:
         cntkOutput = cntkOutput[bboxIndices, :] # only keep output for certain rois
     else:
         cntkOutput = cntkOutput[:len(boxes), :] # remove zero-padded rois
