@@ -162,8 +162,7 @@ The learned linear classifiers for each class, i.e. a weight vector of dimension
 
 Once training succeeded, the model can be used to find objects in images. For this, every ROI in an image is classified and assigned a confidence to be orange, ketchup, ... and background. The class with highest confidence is then selected (most often “background”) and optionally a threshold applied to reject detections with low confidence.
 
-The accuracy of the classifier can be measured using the script `5_evaluateResults.py`. This outputs the mean Average Precision (mAP; see the [Mean Average Precision](#mean-average-precision) section) for either the training or the test set.
-Note that mAP's for both set are similar, which indicates that the classifier does not over-fit to the training data. However, keep in mind that the test set only contains 5 images and hence these numbers need to be taken with a grain of salt. Due to randomization effects one should get similar, although likely not identical numbers when running the script.
+The accuracy of the classifier can be measured using the script `5_evaluateResults.py`. This outputs the mean Average Precision (mAP; see the [Mean Average Precision](#mean-average-precision) section) for either the training or the test set. Keep in mind that the test set only contains 5 images and hence these numbers need to be taken with a grain of salt. Due to randomization effects one might get very different results when running the script.
 
 <!-- Note that the mAP for the training set is much higher than for the test set. This is because the classifier was able to memorize the (tiny) training set but not to generalize well to new images (aka. over-fitting). Also, the accuracy on cars is much better than for people, which might be due to the fact that cars are typically much bigger in the image. The accuracy on the test is very bad, which is due to the detections being not very accuracy (see the results for the three images below) and due to test set containing only three images. -->
 
@@ -179,7 +178,7 @@ Results using 2000 ROIs:
 |---|---|---|---|---|---|---
 |Test Set|    0.32       | 0.48      | 0.82      | 0.82          |   |**0.65**
 
-The output of the classifier usign 2000 ROIs can be visualized using the script `5_visualizeResults.py`. Only ROIs classified as grocery item are shown (not background), and only if the confidence in the detection is greater or above 0.5. Multiple ROIs are combined into single detections using   [Non-Maxima Suppression](#non-maxima-suppression), the output of which is visualized below for the test images.
+The output of the classifier using 2000 ROIs can be visualized using the script `5_visualizeResults.py`. Only ROIs classified as grocery item are shown (not background), and only if the confidence in the detection is greater or above 0.5. Multiple ROIs are combined into single detections using   [Non-Maxima Suppression](#non-maxima-suppression), the output of which is visualized below for the test images.
 
 <p align="center">
 <img src="doc/svm_010.jpg" alt="alt text" height="300"/>
